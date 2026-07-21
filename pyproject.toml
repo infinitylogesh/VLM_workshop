@@ -1,0 +1,44 @@
+[project]
+name = "vlm-workshop"
+version = "0.1.0"
+description = "VLM SFT + GRPO workshop: Qwen3.5-4B on receipt extraction (SROIE + CORD)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # pinned to the versions verified working on this box (RTX PRO 6000 Blackwell,
+    # CUDA 12.8 driver, torch cu128). uv.lock captures the full transitive graph.
+    "torch==2.11.0",
+    "torchvision==0.26.0",
+    "transformers==5.6.2",
+    "trl[peft]==1.2.0",
+    "peft==0.19.1",
+    "datasets==4.8.4",
+    "accelerate==1.13.0",
+    "bitsandbytes==0.49.2",
+    "liger-kernel==0.8.0",       # 0.8.0 adds qwen3_5 fused CE (avoids full-logits OOM)
+    "qwen-vl-utils==0.0.14",
+    "flash-attn==2.8.3.post1",   # prebuilt wheel under wheels/ (see [tool.uv.sources])
+    "pillow==12.2.0",
+    "numpy==1.26.4",
+    "einops==0.8.2",
+    "tensorboard==2.20.0",       # optional --report-to tensorboard
+    "wandb==0.26.1",             # optional --report-to wandb
+]
+
+[tool.uv]
+package = false                  # virtual project: import via PYTHONPATH=src, no build step
+# flash-attn ships as a prebuilt local wheel (no compilation); no build isolation needed.
+no-build-isolation-package = ["flash-attn"]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+# keep torch/vision on the cu128 build (matches the 12.8 driver + system nvcc).
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+# reuse the flash-attn already compiled on this machine (repacked into a wheel) so
+# `uv sync` never recompiles it.
+flash-attn = { path = "wheels/flash_attn-2.8.3.post1-cp312-cp312-linux_x86_64.whl" }

@@ -1,0 +1,150 @@
+# VLM SFT + GRPO — Experiment Report
+
+Fine-tuning vision-language models to extract structured JSON from receipt images,
+comparing **SFT** and **GRPO** (RL) across three base models, on a combined
+multi-task dataset of **SROIE** and **CORD-v2**.
+
+- **wandb project:** https://wandb.ai/infinitylogesh/vlm-workshop
+- **Code:** `train/`, `scripts/`, `src/vlm_workshop/` in this repo. Reproduce with `scripts/run_all.sh` (Qwen) / `scripts/run_gemma_all.sh` (Gemma).
+
+---
+
+## 1. Setup
+
+| | |
+|---|---|
+| **Task** | receipt image → structured JSON extraction |
+| **Datasets** | `rth/sroie-2019-v2` (flat 4 fields: company/date/address/total) + `naver-clova-ix/cord-v2` (nested itemized `gt_parse`), combined multi-task |
+| **Train / test** | SROIE 626/347, CORD 800/100 → combined train ≈ 1426; eval on 100/dataset |
+| **Method** | bf16 **LoRA** (r=32); SFT (completion-only loss, vision tokens masked) then **GRPO** continuing the SFT adapter |
+| **GRPO reward** | **local & deterministic** (no LLM judge): `0.3·parsable + 0.5·field_f1 + 0.2·value_acc`, built on a leaf-multiset normalization of the target JSON |
+| **GRPO config** | `num_generations=8`, `max_completion_length=768`, `beta=0`, `lr=1e-5`, 250 steps, TRL transformers-backend rollouts (`use_vllm=False`) |
+| **Hardware** | 1× RTX PRO 6000 Blackwell (96 GB), CUDA 12.8, torch cu128 |
+| **Env** | reproducible via `uv` (`pyproject.toml` + `uv.lock`); `flash-attn` prebuilt wheel under `wheels/` |
+
+### Metrics
+
+Every prediction and ground-truth JSON is normalized to a multiset of
+`(leaf-key, normalized-value)` leaves (works for both flat SROIE and nested CORD):
+
+- **json_valid** — fraction that parse to valid JSON
+- **field_f1** — F1 over the leaf-**key** set (did it find the right fields)
+- **pair_f1** — F1 over `(key, value)` pairs (**headline metric** — did it extract them correctly)
+- **value_acc** — of keys present in both, fraction with the correct value
+
+---
+
+## 2. Runs (wandb)
+
+| run | model | stage | wandb |
+|---|---|---|---|
+| `grpo` | Qwen3.5-4B (instruct) | GRPO | https://wandb.ai/infinitylogesh/vlm-workshop/runs/nq0iod4i |
+| `base-sft` | Qwen3.5-4B-Base | SFT | https://wandb.ai/infinitylogesh/vlm-workshop/runs/izet5gl8 |
+| `base-grpo` | Qwen3.5-4B-Base | GRPO | https://wandb.ai/infinitylogesh/vlm-workshop/runs/t49f2y9l |
+| `gemma-sft` | Gemma-4-E2B (base) | SFT | https://wandb.ai/infinitylogesh/vlm-workshop/runs/cm5pygj5 |
+| `gemma-grpo` | Gemma-4-E2B (base) | GRPO | https://wandb.ai/infinitylogesh/vlm-workshop/runs/w3eseyl0 |
+
+> The Qwen **instruct SFT** run predates wandb being wired in and is TensorBoard-only
+> (`outputs/sft/runs/`). Eval JSONs for every stage are under `outputs/**/eval/`.
+
+---
+
+## 3. Results
+
+Headline = **pair_f1** (key+value correctness). All eval on 100 SROIE + 100 CORD, greedy decode.
+
+### Qwen3.5-4B (instruct)
+
+| metric (macro) | base | SFT | GRPO |
+|---|---|---|---|
+| json_valid | 1.000 | 1.000 | 1.000 |
+| field_f1 | 0.916 | 0.985 | 0.983 |
+| **pair_f1** | **0.795** | **0.900** | **0.893** |
+| value_acc | 0.869 | 0.914 | 0.908 |
+
+Per-dataset: SROIE pair_f1 0.850→0.900→0.882; CORD 0.741→0.901→0.904.
+
+### Qwen3.5-4B-Base
+
+| metric (macro) | base | SFT | GRPO |
+|---|---|---|---|
+| json_valid | 1.000 | 1.000 | — |
+| field_f1 | 0.915 | 0.985 | — |
+| **pair_f1** | **0.791** | **0.902** | (eval interrupted) |
+| value_acc | 0.865 | 0.914 | — |
+
+The base checkpoint already extracts about as well as the instruct model (0.791 vs
+0.795), and SFT converges to the same ~0.90. GRPO training finished (`base-grpo`,
+adapter at `outputs/from_base/grpo`) but its eval was interrupted.
+
+### Gemma-4-E2B (base)
+
+| metric (macro) | base | SFT | GRPO |
+|---|---|---|---|
+| json_valid | 0.000 | 1.000 | 1.000 |
+| field_f1 | 0.000 | 0.968 | 0.969 |
+| **pair_f1** | **0.000** | **0.863** | **0.862** |
+| value_acc | 0.000 | 0.891 | 0.889 |
+
+Per-dataset: SROIE pair_f1 0.000→0.873→0.875; CORD 0.000→0.854→0.848. The raw base
+is a true blank slate (0% valid JSON — it cannot follow the instruction zero-shot),
+so SFT delivers a genuine 0→0.86 jump. SFT trained in ~11 min (E2B is tiny).
+
+---
+
+## 4. Cross-model summary (macro pair_f1)
+
+| model | base | SFT | GRPO | GRPO − SFT |
+|---|---|---|---|---|
+| Qwen3.5-4B (instruct) | 0.795 | 0.900 | 0.893 | −0.007 |
+| Qwen3.5-4B-Base | 0.791 | 0.902 | — | — |
+| Gemma-4-E2B (base) | 0.000 | 0.863 | 0.862 | −0.002 |
+
+---
+
+## 5. Key findings
+
+1. **SFT does essentially all of the work; GRPO is flat.** Across an instruct model,
+   a capable base, and a true 0.0 blank slate, GRPO changed macro pair_f1 by
+   ≤ ±0.01 — within the noise of a 100-example eval (small gains on CORD, small
+   regressions on SROIE).
+2. **The base's starting point didn't matter for the *outcome*.** Whether the base
+   was 0.79 (Qwen) or 0.00 (Gemma), SFT converged to ~0.86–0.90 with `json_valid = 1.0`.
+3. **Why GRPO stalls: SFT saturates the reward.** After SFT, the model's 8 sampled
+   completions per prompt almost all score high (mean reward ≈ 0.98 in the logs), so
+   the within-group advantage is ~0 → little/no gradient signal. This is a property
+   of the *reward + SFT quality*, not of the base model.
+
+## 6. What would make GRPO win
+
+The bottleneck is SFT saturation, not the base model. Effective changes:
+
+- **Undertrained SFT** (`--epochs 1` or `--limit-per-dataset ~150`) so SFT leaves real
+  errors (parse failures, wrong values) for GRPO to fix.
+- **Stricter reward** — exact full-JSON match (all-or-nothing) instead of partial
+  leaf-F1, creating headroom above SFT.
+- More GRPO steps / higher LR / higher sampling temperature to increase completion diversity.
+
+---
+
+## 7. Reproduce
+
+```bash
+uv sync && source .venv/bin/activate && export PYTHONPATH=src
+
+# Qwen3.5-4B: base-eval -> SFT -> SFT-eval -> GRPO -> GRPO-eval
+bash scripts/run_all.sh                 # instruct (default model Qwen/Qwen3.5-4B)
+# Qwen base variant -> outputs/from_base/
+bash scripts/run_from_base.sh
+
+# Gemma-4-E2B (separate backend) -> outputs/gemma/
+bash scripts/run_gemma_all.sh
+
+# single-stage examples
+python scripts/eval.py --adapter outputs/sft --limit-per-dataset 100 --tag sft
+python train/grpo.py --adapter outputs/sft --max-steps 250 --report-to tensorboard,wandb
+```
+
+Trackers: set `REPORT=tensorboard,wandb` (wandb uses `~/.netrc` creds, project
+`vlm-workshop`). Note: `/workspace` is not a persistent volume here — adapters under
+`outputs/` should be pushed to the HF Hub to survive an instance recycle.
