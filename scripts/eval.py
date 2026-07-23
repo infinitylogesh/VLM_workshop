@@ -37,6 +37,8 @@ def main():
     ap.add_argument("--max-pixels", type=int, default=DEFAULT_MAX_PIXELS)
     ap.add_argument("--out", default=None, help="write per-example + summary JSON here")
     ap.add_argument("--tag", default=None)
+    ap.add_argument("--think", action="store_true", default=False,
+                    help="prime <think> (match a think-trained adapter); give a larger --max-new-tokens")
     args = ap.parse_args()
 
     tag = args.tag or (os.path.basename(args.adapter.rstrip("/")) if args.adapter else "base")
@@ -63,7 +65,7 @@ def main():
         d = ex["dataset"]
         messages = build_messages(d, ex["image"], ex["target"], args.max_pixels, with_answer=False)
         text = processor.apply_chat_template(messages, tokenize=False,
-                                             add_generation_prompt=True, enable_thinking=False)
+                                             add_generation_prompt=True, enable_thinking=args.think)
         imgs, _ = process_vision_info(messages)
         inputs = processor(text=[text], images=imgs, return_tensors="pt",
                            truncation=True, max_length=8192).to(model.device)

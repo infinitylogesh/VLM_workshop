@@ -25,7 +25,8 @@ from peft import PeftModel
 
 from vlm_workshop.data import build_unified
 from vlm_workshop.gemma import (GEMMA_BASE, GEMMA_STOP_IDS, align_gemma_generation,
-                                build_gemma_messages, load_gemma_model, load_gemma_processor)
+                                build_gemma_messages, load_gemma_model, load_gemma_processor,
+                                prime_think)
 from vlm_workshop.metrics import extract_json, score
 
 TEST_SPLIT = {"sroie": "test", "cord": "test"}
@@ -39,14 +40,18 @@ def main():
     ap.add_argument("--limit-per-dataset", type=int, default=None)
     ap.add_argument("--max-new-tokens", type=int, default=768)
     ap.add_argument("--attn", default="eager")
+    ap.add_argument("--think", action="store_true", default=False,
+                    help="prime <think> and match a think-trained adapter")
     ap.add_argument("--out", default=None)
     ap.add_argument("--tag", default=None)
     args = ap.parse_args()
 
     tag = args.tag or (os.path.basename(args.adapter.rstrip("/")) if args.adapter else "gemma-base")
-    print(f"[eval] tag={tag} model={args.model} adapter={args.adapter}", flush=True)
+    print(f"[eval] tag={tag} model={args.model} adapter={args.adapter} think={args.think}", flush=True)
 
     processor = load_gemma_processor(args.model)
+    if args.think:
+        prime_think(processor)
     t0 = time.time()
     model = load_gemma_model(args.model, attn=args.attn, device_map={"": 0})
     align_gemma_generation(model)
@@ -64,7 +69,7 @@ def main():
     t1 = time.time()
     for i, ex in enumerate(ds):
         d = ex["dataset"]
-        messages = build_gemma_messages(d, ex["image"])
+        messages = build_gemma_messages(d, ex["image"], think=args.think)
         inputs = processor.apply_chat_template(
             messages, add_generation_prompt=True, tokenize=True,
             return_dict=True, return_tensors="pt").to(model.device)

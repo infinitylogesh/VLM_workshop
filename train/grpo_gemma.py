@@ -20,8 +20,8 @@ from trl import GRPOConfig, GRPOTrainer
 
 from vlm_workshop.data import build_grpo_dataset
 from vlm_workshop.gemma import (GEMMA_BASE, LORA_TARGETS, align_gemma_generation,
-                                load_gemma_model, load_gemma_processor)
-from vlm_workshop.reward import receipt_reward
+                                load_gemma_model, load_gemma_processor, prime_think)
+from vlm_workshop.reward import make_receipt_reward
 
 
 def main():
@@ -46,6 +46,12 @@ def main():
     ap.add_argument("--attn", default="eager")
     ap.add_argument("--report-to", default="none")
     ap.add_argument("--save-steps", type=int, default=50)
+    # ON by default, but the disk-filling IMAGE column is dropped (see below), so
+    # only TEXT completions (prompt+completion+rewards) go to wandb.
+    ap.add_argument("--no-log-completions", dest="log_completions", action="store_false", default=True)
+    ap.add_argument("--resume-from", default=None, help="resume from a checkpoint dir")
+    ap.add_argument("--think", action="store_true", default=False,
+                    help="prime the completion with <think> and reward only the post-</think> JSON")
     ap.add_argument("--smoke", action="store_true")
     args = ap.parse_args()
 
@@ -57,6 +63,9 @@ def main():
     print(f"[cfg] {vars(args)}", flush=True)
 
     processor = load_gemma_processor(args.model)
+    if args.think:
+        prime_think(processor)  # generation prompt now ends with <|turn>model\n<think>\n
+        print("[think] priming <think>; reward reads JSON after </think>", flush=True)
     model = load_gemma_model(args.model, four_bit=args.four_bit, attn=args.attn, device_map={"": 0})
     align_gemma_generation(model)
     if args.four_bit:
@@ -76,7 +85,7 @@ def main():
     model.print_trainable_parameters()
 
     split_map = {d: "train" for d in args.datasets.split(",")}
-    dataset = build_grpo_dataset(split_map, args.limit_per_dataset)
+    dataset = build_grpo_dataset(split_map, args.limit_per_dataset, think=args.think)
     from collections import Counter
     print(f"[data] {len(dataset)} prompts: {Counter(dataset['dataset'])}", flush=True)
 
@@ -105,15 +114,23 @@ def main():
         logging_steps=1,
         save_strategy="steps",
         save_steps=args.save_steps,
-        log_completions=True,
+        save_total_limit=2,
+        log_completions=args.log_completions,
         num_completions_to_print=1,
         report_to=report_to,
     )
 
-    trainer = GRPOTrainer(model=model, reward_funcs=receipt_reward, args=cfg,
+    trainer = GRPOTrainer(model=model, reward_funcs=make_receipt_reward(think=args.think), args=cfg,
                           train_dataset=dataset, processing_class=processor)
+    # Log completions to wandb as TEXT only: TRL adds an `image` column
+    # (wandb.Image per row) that stages GBs of media and fills the disk. A
+    # zero-length deque swallows the image appends, leaving prompt+completion+rewards.
+    if args.log_completions and getattr(trainer, "_logs", None) is not None and "images" in trainer._logs:
+        import collections
+        trainer._logs["images"] = collections.deque(maxlen=0)
+        print("[log] completions -> wandb as TEXT (image column dropped)", flush=True)
     print("[train] starting Gemma GRPO ...", flush=True)
-    trainer.train()
+    trainer.train(resume_from_checkpoint=args.resume_from)
     trainer.save_model(args.output_dir)
     processor.save_pretrained(args.output_dir)
     print(f"[done] adapter saved to {args.output_dir}", flush=True)

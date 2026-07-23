@@ -66,11 +66,28 @@ def align_gemma_generation(model):
     return model
 
 
-def build_gemma_messages(dataset: str, image, target: str | None = None, with_answer: bool = False):
+THINK_SUFFIX = ("\nFirst reason step by step inside <think> ... </think>, then output "
+                "ONLY the JSON in a ```json block.")
+
+
+def prime_think(processor):
+    """Make the generation prompt end with `<|turn>model\\n<think>\\n` so every
+    rollout/eval starts inside a reasoning block (Gemma base has no think template).
+    Reward/eval read only the JSON after </think>. Idempotent."""
+    ct = processor.chat_template
+    if ct and "<think>" not in ct:
+        processor.chat_template = ct.replace(r"'<|turn>model\n'", r"'<|turn>model\n<think>\n'")
+    return processor
+
+
+def build_gemma_messages(dataset: str, image, target: str | None = None,
+                         with_answer: bool = False, think: bool = False):
     from .prompts import PROMPTS
     p = PROMPTS[dataset]
     text = (p["instruction"] + "\nReturn ONLY valid JSON matching this schema (no prose, "
             f"no markdown outside the json block):\n```json\n{p['schema']}\n```")
+    if think:
+        text += THINK_SUFFIX
     msgs = [{"role": "user", "content": [{"type": "image", "image": image},
                                          {"type": "text", "text": text}]}]
     if with_answer:

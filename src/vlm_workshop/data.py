@@ -142,7 +142,12 @@ _GRPO_FEATURES = Features({
 })
 
 
-def build_grpo_dataset(split_map, limit_per_dataset=None, max_pixels=DEFAULT_MAX_PIXELS, seed=42):
+THINK_SUFFIX = ("\nFirst reason step by step inside <think> ... </think>, then output "
+                "ONLY the JSON in a ```json block.")
+
+
+def build_grpo_dataset(split_map, limit_per_dataset=None, max_pixels=DEFAULT_MAX_PIXELS,
+                       seed=42, think=False):
     base = build_unified(split_map, limit_per_dataset, max_pixels, seed)
     rows = []
     for ex in base:
@@ -150,12 +155,14 @@ def build_grpo_dataset(split_map, limit_per_dataset=None, max_pixels=DEFAULT_MAX
         # (TRL fills it from the `images` column).
         from .prompts import PROMPTS
         p = PROMPTS[ex["dataset"]]
+        schema_text = ("Return ONLY valid JSON matching this schema (no prose, no "
+                       f"markdown outside the json block):\n```json\n{p['schema']}\n```")
+        if think:
+            schema_text += THINK_SUFFIX
         content = [
             {"type": "text", "text": p["instruction"]},
             {"type": "image", "text": None},
-            {"type": "text",
-             "text": "Return ONLY valid JSON matching this schema (no prose, no "
-                     f"markdown outside the json block):\n```json\n{p['schema']}\n```"},
+            {"type": "text", "text": schema_text},
         ]
         rows.append({"prompt": [{"role": "user", "content": content}],
                      "images": [ex["image"]],

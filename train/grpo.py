@@ -24,7 +24,7 @@ from trl import GRPOConfig, GRPOTrainer
 from vlm_workshop.common import (BASE_MODEL, LORA_TARGETS, align_generation,
                                  load_model, load_processor)
 from vlm_workshop.data import DEFAULT_MAX_PIXELS, build_grpo_dataset
-from vlm_workshop.reward import receipt_reward
+from vlm_workshop.reward import make_receipt_reward
 
 
 def _patch_trl_liger_mrope(image_pad_id):
@@ -103,6 +103,10 @@ def main():
     ap.add_argument("--no-liger", dest="liger", action="store_false", default=True)
     ap.add_argument("--report-to", default="none")
     ap.add_argument("--save-steps", type=int, default=50)
+    ap.add_argument("--think", action="store_true", default=False,
+                    help="enable reasoning: Qwen's chat template primes <think>, the "
+                         "prompt asks to reason, and a format reward scores a proper "
+                         "single <think></think>. Give a larger --max-completion-length.")
     ap.add_argument("--smoke", action="store_true",
                     help="tiny run: 2 gens, 4 examples/dataset, 1 step")
     args = ap.parse_args()
@@ -139,7 +143,7 @@ def main():
     model.print_trainable_parameters()
 
     split_map = {d: "train" for d in args.datasets.split(",")}
-    dataset = build_grpo_dataset(split_map, args.limit_per_dataset, args.max_pixels)
+    dataset = build_grpo_dataset(split_map, args.limit_per_dataset, args.max_pixels, think=args.think)
     from collections import Counter
     print(f"[data] {len(dataset)} prompts: {Counter(dataset['dataset'])}", flush=True)
 
@@ -157,7 +161,7 @@ def main():
         max_completion_length=args.max_completion_length,
         temperature=args.temperature,
         top_p=1.0,
-        chat_template_kwargs={"enable_thinking": False},
+        chat_template_kwargs={"enable_thinking": args.think},
         beta=args.beta,
         learning_rate=args.lr,
         lr_scheduler_type="constant",
@@ -176,8 +180,14 @@ def main():
         report_to=report_to,
     )
 
-    trainer = GRPOTrainer(model=model, reward_funcs=receipt_reward, args=cfg,
+    trainer = GRPOTrainer(model=model, reward_funcs=make_receipt_reward(think=args.think), args=cfg,
                           train_dataset=dataset, processing_class=processor)
+    # Log completions to wandb as TEXT only: drop TRL's image column (wandb.Image
+    # per row) that otherwise stages GBs of media and fills the disk.
+    if getattr(trainer, "_logs", None) is not None and "images" in trainer._logs:
+        import collections
+        trainer._logs["images"] = collections.deque(maxlen=0)
+        print("[log] completions -> wandb as TEXT (image column dropped)", flush=True)
     print("[train] starting GRPO ...", flush=True)
     trainer.train()
     trainer.save_model(args.output_dir)
