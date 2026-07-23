@@ -43,6 +43,10 @@ Every prediction and ground-truth JSON is normalized to a multiset of
 | `base-grpo` | Qwen3.5-4B-Base | GRPO | https://wandb.ai/infinitylogesh/vlm-workshop/runs/t49f2y9l |
 | `gemma-sft` | Gemma-4-E2B (base) | SFT | https://wandb.ai/infinitylogesh/vlm-workshop/runs/cm5pygj5 |
 | `gemma-grpo` | Gemma-4-E2B (base) | GRPO | https://wandb.ai/infinitylogesh/vlm-workshop/runs/w3eseyl0 |
+| `gemma-base-rl-think` | Gemma-4-E2B (base) | GRPO-from-base (+`<think>`) | https://wandb.ai/infinitylogesh/vlm-workshop/runs/diuevfka |
+| `distill-student-sft` | Qwen3.5-0.8B | SFT warmup (distill) | https://wandb.ai/infinitylogesh/vlm-workshop/runs/1dc5syn3 |
+| `distill-gkd` | Qwen3.5-0.8B | on-policy distillation (warmup→GKD) | https://wandb.ai/infinitylogesh/vlm-workshop/runs/js16xrf8 |
+| `distill-gkd-nowarmup` | Qwen3.5-0.8B | on-policy distillation (cold base) | https://wandb.ai/infinitylogesh/vlm-workshop/runs/s14iymkt |
 
 > The Qwen **instruct SFT** run predates wandb being wired in and is TensorBoard-only
 > (`outputs/sft/runs/`). Eval JSONs for every stage are under `outputs/**/eval/`.
@@ -102,7 +106,72 @@ so SFT delivers a genuine 0→0.86 jump. SFT trained in ~11 min (E2B is tiny).
 
 ---
 
-## 5. Key findings
+## 5. On-policy distillation (Qwen3.5-4B → Qwen3.5-0.8B)
+
+Distil the strong 4B extractor into a **5× smaller** 0.8B student with TRL's **GKD**
+(Generalized Knowledge Distillation = on-policy distillation, `trl.experimental.gkd`).
+The student samples completions, the frozen teacher scores them, and the
+**generalized Jensen-Shannon divergence** (`beta=0.5`, symmetric) pulls the student's
+token distribution toward the teacher's — no gold labels in the on-policy loss.
+
+Both models are the same Qwen3.5 family: identical vocab (248077) and identical image
+tokenization (475 `<|image_pad|>` per receipt), so one `input_ids` scores on both and
+same-vocab JSD is valid. Stock `GKDTrainer` is text-only (forwards no `pixel_values`);
+`src/vlm_workshop/distill.py` adds a VLM collator + trainer that thread
+`pixel_values`/`image_grid_thw` + recomputed `mm_token_type_ids` (Qwen3.5 M-RoPE)
+through both the on-policy generation and the JSD forwards.
+
+### Config
+
+| | |
+|---|---|
+| **Teacher** | Qwen3.5-4B + SFT adapter (`outputs/sft`), merged & frozen, eval mode (macro pair_f1 0.900) |
+| **Student** | Qwen3.5-0.8B, bf16 **LoRA** r=32 (12.8 M trainable, 1.48 %) |
+| **Loss** | generalized JSD, `beta=0.5`; **pure on-policy** `lmbda=1.0` (completion generated from the prompt → exact logit slicing) |
+| **Sampling** | `temperature=0.9`, `max_new_tokens=384`, `do_sample=True` |
+| **Optim** | `lr=1e-5` constant, `per_device_batch=1`, `grad_accum=4`, gradient-checkpointing **off** (KV cache on → ~11.5 s/step) |
+| **Data** | same combined SROIE+CORD, `limit_per_dataset=500` (≈1000 prompts) |
+| **Warmup** (variant A) | short student SFT: `limit_per_dataset=500`, 1 epoch (63 steps), `lr=2e-4` |
+
+Two variants, differing only in the student's starting point and step budget:
+
+- **A — warmup → GKD:** SFT-warm the 0.8B first (63 steps), then GKD **400 steps**.
+- **B — cold base → GKD:** fresh LoRA on the raw 0.8B, GKD **1000 steps**, no SFT.
+
+### Results (macro, eval on 100 SROIE + 100 CORD, greedy)
+
+| Qwen3.5-0.8B student | json_valid | field_f1 | **pair_f1** | value_acc |
+|---|---|---|---|---|
+| base (zero-shot) | 1.000 | 0.879 | **0.653** | 0.750 |
+| SFT warmup only | 1.000 | 0.945 | **0.823** | 0.869 |
+| **A · warmup → GKD (400)** | 1.000 | 0.959 | **0.847** | 0.881 |
+| **B · cold base → GKD (1000)** | 1.000 | 0.925 | **0.810** | 0.876 |
+| *teacher — Qwen3.5-4B SFT* | *1.000* | *0.985* | *0.900* | *0.914* |
+
+Per-dataset: **A** SROIE/CORD not broken out here; **B** SROIE pair_f1 **0.853** (field_f1 1.000), CORD **0.769** (nested, harder).
+
+### Findings
+
+1. **Distillation gives a real gain — unlike GRPO.** On the warmed student, GKD moved
+   pair_f1 **0.823 → 0.847 (+0.024)**, closing ~⅓ of the gap to the 4B teacher with a
+   5× smaller model. GRPO was flat (±0.01) because SFT saturated the reward; here the
+   small student had genuine headroom and the teacher's full token distribution is a
+   richer signal than gold labels alone.
+2. **On-policy distillation works from a cold start, but the warmup wins.** Pure
+   on-policy from the raw base lifted the student **0.653 → 0.810 (+0.157)** with no
+   labels — strong for label-free training — yet even at 1000 steps (2.5× variant A's
+   400) it stayed **below the SFT warmup alone** (0.823) and well below warmup→GKD
+   (0.847). More steps did not close it; it plateaus.
+3. **Why:** on-policy learning only corrects what the student actually samples. A
+   cheap supervised init (~63 steps, minutes) moves the student into a better region
+   than thousands of on-policy steps from cold. Best recipe: **warmup → on-policy GKD.**
+
+Adapters (private HF): warmup+GKD → `infinitylogesh/vlm-workshop-qwen3.5-0.8b-distilled`,
+cold → `…-distilled-nowarmup`.
+
+---
+
+## 6. Key findings
 
 1. **SFT does essentially all of the work; GRPO is flat.** Across an instruct model,
    a capable base, and a true 0.0 blank slate, GRPO changed macro pair_f1 by
@@ -115,7 +184,7 @@ so SFT delivers a genuine 0→0.86 jump. SFT trained in ~11 min (E2B is tiny).
    the within-group advantage is ~0 → little/no gradient signal. This is a property
    of the *reward + SFT quality*, not of the base model.
 
-## 6. What would make GRPO win
+## 7. What would make GRPO win
 
 The bottleneck is SFT saturation, not the base model. Effective changes:
 
@@ -127,7 +196,7 @@ The bottleneck is SFT saturation, not the base model. Effective changes:
 
 ---
 
-## 7. Reproduce
+## 8. Reproduce
 
 ```bash
 uv sync && source .venv/bin/activate && export PYTHONPATH=src
@@ -143,6 +212,10 @@ bash scripts/run_gemma_all.sh
 # single-stage examples
 python scripts/eval.py --adapter outputs/sft --limit-per-dataset 100 --tag sft
 python train/grpo.py --adapter outputs/sft --max-steps 250 --report-to tensorboard,wandb
+
+# on-policy distillation (teacher Qwen3.5-4B SFT -> student Qwen3.5-0.8B)
+bash scripts/run_distill.sh              # variant A: SFT warmup -> GKD (400) -> eval -> push
+bash scripts/run_distill_nowarmup.sh     # variant B: cold base -> GKD (1000) -> eval -> push
 ```
 
 Trackers: set `REPORT=tensorboard,wandb` (wandb uses `~/.netrc` creds, project
