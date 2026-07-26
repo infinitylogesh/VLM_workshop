@@ -169,6 +169,31 @@ Per-dataset: **A** SROIE/CORD not broken out here; **B** SROIE pair_f1 **0.853**
 Adapters (private HF): warmup+GKD → `infinitylogesh/vlm-workshop-qwen3.5-0.8b-distilled`,
 cold → `…-distilled-nowarmup`.
 
+### Follow-ups: GRPO on the student, and a divergence (β) sweep
+
+Two questions on top of variant A (warmup→GKD, JSD, 0.847):
+
+**Q1 — can GRPO push the distilled 0.8B past the 4B teacher (0.900)?** GRPO on the
+distilled student (300 steps, `beta=0`, `num_generations=8`) → **0.842**, i.e. *flat*
+(−0.005) vs its 0.847 start. During training the reward stayed high (~0.92–0.99) with
+advantage variance only intermittently non-zero — **the same saturation that stalled
+GRPO on the 4B.** So the 0.8B plateaus at ~0.85 and does **not** beat the 4B; GRPO's
+null result is about **reward saturation, not model size or head-room below a teacher.**
+
+**Q2 — which JSD interpolation β distills best?** Sweeping β from the same warmup
+checkpoint (400 steps each):
+
+| β (divergence) | macro pair_f1 |
+|---|---|
+| 0.0 — forward KL (mean-covering) | 0.845 |
+| 0.5 — JSD (symmetric) | **0.847** |
+| 1.0 — reverse KL (mode-seeking) | 0.838 |
+
+All within ~0.01 — **β barely matters here.** JSD is marginally best and reverse-KL
+marginally worst (mildly against the usual "reverse-KL wins for distillation" prior),
+likely because structured-JSON outputs are low-entropy, so the divergence *direction*
+has little to bite on. Adapters: `outputs/distill/gkd_grpo`, `gkd_beta00`, `gkd_beta10`.
+
 ---
 
 ## 6. Key findings
