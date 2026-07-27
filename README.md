@@ -6,6 +6,18 @@ multi-task dataset of **SROIE** (flat key fields) and **CORD-v2** (itemized rece
 
 📊 **Experiment results & analysis (Qwen + Gemma, with wandb links): [REPORT.md](REPORT.md)**
 
+🎓 **New to this? Start with [`workshop_walkthrough.ipynb`](workshop_walkthrough.ipynb)** — an
+interactive tour of all four post-training methods (**SFT · GRPO · distillation · self-distillation**)
+that dissects the real code in `src/vlm_workshop/` and `train/` on live SROIE/CORD samples: the local
+reward, the completion-only loss mask, the teacher-vs-student prompts, and the measured results — plus a
+live "extract this receipt" demo (base vs. SFT). Runs in a few minutes; full training stays in the
+scripts below.
+
+```bash
+uv sync && source .venv/bin/activate && export PYTHONPATH=src
+jupyter lab workshop_walkthrough.ipynb
+```
+
 The reward and eval metrics are **fully local and deterministic** (no LLM judge): every
 target JSON — SROIE's 4 flat fields and CORD's nested `gt_parse` — is normalized to a
 multiset of `(leaf-key, value)` leaves, from which we compute field-F1, pair-F1, and
