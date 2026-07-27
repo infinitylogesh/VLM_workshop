@@ -18,6 +18,11 @@ uv sync && source .venv/bin/activate && export PYTHONPATH=src
 jupyter lab workshop_walkthrough.ipynb
 ```
 
+📖 Or just read it: **[`docs/index.html`](docs/index.html)** is a self-contained, distill.pub-style
+**interactive post** spanning both workshop repos (Part I — how a VLM is built; Part II — how it's
+trained), with live figures including a working **reward calculator**, the SFT loss-mask highlighter, the
+teacher-vs-student prompt diff, and the results chart. Open it in any browser — no build step.
+
 The reward and eval metrics are **fully local and deterministic** (no LLM judge): every
 target JSON — SROIE's 4 flat fields and CORD's nested `gt_parse` — is normalized to a
 multiset of `(leaf-key, value)` leaves, from which we compute field-F1, pair-F1, and
