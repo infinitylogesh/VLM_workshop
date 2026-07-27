@@ -1,0 +1,1308 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Anatomy of a Vision-Language Model — and how to teach it</title><meta name="description" content="An interactive, in-depth workshop companion: how a small vision-language model is built from a plain LLM, and the four ways to post-train it — SFT, GRPO, distillation, and self-distillation. With live widgets, real training curves, and full derivations."><style>
+:root{
+  --ground:#fbfcfd; --panel:#f3f5f8; --panel-2:#eaeef3; --ink:#14161c; --ink-2:#3a3f4b;
+  --muted:#6b7280; --line:#dbe0e8; --line-2:#c7cedb;
+  --accent:#4f46e5; --accent-ink:#3b32c9; --accent-soft:#e8e7fb;
+  --good:#15803d; --good-soft:#dcfce7; --bad:#e11d48; --bad-soft:#ffe4ea;
+  --img:#0891b2; --img-soft:#cffafe; --amber:#b45309; --amber-soft:#fef3c7;
+  --serif: Charter,"Bitstream Charter","Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --sans: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono: ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --measure:42rem;
+}
+@media (prefers-color-scheme:dark){:root{
+  --ground:#0e1116; --panel:#171b22; --panel-2:#1e232c; --ink:#e7e9ee; --ink-2:#b7bdc9;
+  --muted:#8b93a1; --line:#272d38; --line-2:#333b48;
+  --accent:#8b83ff; --accent-ink:#a49dff; --accent-soft:#20213a;
+  --good:#4ade80; --good-soft:#12291a; --bad:#fb7185; --bad-soft:#2c151d;
+  --img:#38bdf8; --img-soft:#0d2530; --amber:#fbbf24; --amber-soft:#2a2109;
+}}
+:root[data-theme="light"]{--ground:#fbfcfd;--panel:#f3f5f8;--panel-2:#eaeef3;--ink:#14161c;--ink-2:#3a3f4b;--muted:#6b7280;--line:#dbe0e8;--line-2:#c7cedb;--accent:#4f46e5;--accent-ink:#3b32c9;--accent-soft:#e8e7fb;--good:#15803d;--good-soft:#dcfce7;--bad:#e11d48;--bad-soft:#ffe4ea;--img:#0891b2;--img-soft:#cffafe;--amber:#b45309;--amber-soft:#fef3c7;}
+:root[data-theme="dark"]{--ground:#0e1116;--panel:#171b22;--panel-2:#1e232c;--ink:#e7e9ee;--ink-2:#b7bdc9;--muted:#8b93a1;--line:#272d38;--line-2:#333b48;--accent:#8b83ff;--accent-ink:#a49dff;--accent-soft:#20213a;--good:#4ade80;--good-soft:#12291a;--bad:#fb7185;--bad-soft:#2c151d;--img:#38bdf8;--img-soft:#0d2530;--amber:#fbbf24;--amber-soft:#2a2109;}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;overflow-x:clip}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--serif);font-size:18px;line-height:1.65;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+.wrap{max-width:76rem;margin:0 auto;padding:0 1.25rem}
+.col{max-width:var(--measure);margin:0 auto}
+h1,h2,h3,h4,.eyebrow,.label,.chip,.btn,figcaption,.toc,nav,th,.stat,.mn-num,summary,.fig-title{font-family:var(--sans)}
+h2,h3,h4{text-wrap:balance;letter-spacing:-.011em;line-height:1.2}
+h2{font-size:1.72rem;font-weight:650;margin:0 0 .2rem}
+h3{font-size:1.24rem;font-weight:640;margin:2.2rem 0 .1rem}
+h4{font-size:1.02rem;font-weight:640;margin:1.4rem 0 .1rem;color:var(--ink)}
+p{margin:.85rem 0}
+a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+a:hover{border-bottom-color:var(--accent)}
+code,kbd,.mono{font-family:var(--mono);font-size:.86em}
+p code,li code,td code,summary code{background:var(--panel);padding:.06em .34em;border-radius:5px;border:1px solid var(--line)}
+strong{font-weight:640}
+hr{border:none;border-top:1px solid var(--line);margin:3rem 0}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px;border-radius:3px}
+ul,ol{padding-left:1.2rem} li{margin:.3rem 0}
+math{font-size:1.12em;font-family:var(--serif)}
+math[display="block"]{display:block;margin:1rem auto;text-align:center;overflow-x:auto}
+.topbar{position:sticky;top:0;z-index:40;backdrop-filter:saturate(1.4) blur(8px);background:color-mix(in srgb,var(--ground) 82%,transparent);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;gap:1rem;height:52px}
+.brand{font-family:var(--sans);font-weight:640;font-size:.9rem;letter-spacing:-.01em;color:var(--ink)}
+.brand .dot{color:var(--accent)}
+.topbar .spacer{flex:1}
+.tprog{position:absolute;left:0;bottom:-1px;height:2px;background:var(--accent);width:0}
+.themebtn{font-family:var(--sans);font-size:.8rem;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2);padding:.32rem .6rem;border-radius:7px;cursor:pointer}
+.themebtn:hover{border-color:var(--accent);color:var(--ink)}
+header.hero{padding:3.4rem 0 1.4rem}
+.eyebrow{font-size:.76rem;font-weight:640;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink)}
+h1{font-family:var(--sans);font-size:clamp(2.1rem,5.4vw,3.25rem);line-height:1.04;letter-spacing:-.028em;font-weight:680;margin:.5rem 0 .4rem;text-wrap:balance}
+.dek{font-size:1.2rem;color:var(--ink-2);max-width:38rem;margin:.4rem 0 1.1rem;line-height:1.5}
+.meta{font-family:var(--sans);font-size:.82rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.35rem 1.1rem;align-items:center}
+.meta b{color:var(--ink-2);font-weight:600}
+.readtime{font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-top:.5rem}
+.toc{position:fixed;top:96px;left:max(1rem,calc((100vw - 76rem)/2 + 0.4rem));width:12.5rem;font-size:.8rem;line-height:1.35;color:var(--muted);display:none;max-height:80vh;overflow-y:auto}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc .part{font-weight:680;color:var(--ink-2);letter-spacing:.02em;text-transform:uppercase;font-size:.72rem;margin:.9rem 0 .3rem}
+.toc a{display:block;color:var(--muted);border:none;padding:.11rem 0 .11rem .7rem;border-left:2px solid var(--line)}
+.toc a:hover{color:var(--ink)}
+.toc a.on{color:var(--accent-ink);border-left-color:var(--accent);font-weight:600}
+@media (min-width:1180px){.toc{display:block}}
+.mn{font-family:var(--sans);font-size:.8rem;line-height:1.42;color:var(--muted)}
+@media (min-width:1280px){.mn{position:absolute;width:14.5rem;right:-16.5rem;margin-top:.2rem}}
+@media (max-width:1279px){.mn{display:block;border-left:2px solid var(--accent);background:var(--panel);padding:.6rem .8rem;border-radius:0 8px 8px 0;margin:1rem 0}}
+.mn .mn-num{color:var(--accent-ink);font-weight:640;margin-right:.35em}
+.section{position:relative;margin:3.2rem 0}
+.snum{font-family:var(--sans);font-size:.78rem;font-weight:640;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink)}
+.partdiv{margin:4.2rem 0 2.4rem;padding-top:1.6rem;border-top:2px solid var(--ink)}
+.partdiv .eyebrow{color:var(--muted)}
+.partdiv h2{font-size:2.1rem;margin-top:.2rem}
+figure{margin:1.6rem 0}
+.fig{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:1.05rem 1.1rem 1rem}
+figcaption{font-size:.82rem;color:var(--muted);margin-top:.7rem;line-height:1.45}
+figcaption b{color:var(--ink-2);font-weight:600}
+.fig-title{font-size:.74rem;font-weight:640;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:.5rem;margin-bottom:.85rem}
+.fig-title::before{content:"";width:9px;height:9px;border-radius:2px;background:var(--accent)}
+.controls{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin:.7rem 0 .2rem}
+.btn{font-family:var(--sans);font-size:.82rem;font-weight:560;cursor:pointer;color:var(--ink);background:var(--ground);border:1px solid var(--line-2);border-radius:8px;padding:.4rem .7rem}
+.btn:hover{border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn.pri:hover{filter:brightness(1.06);color:#fff}
+.btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+input[type=range]{accent-color:var(--accent);width:100%}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
+.seg button{font-family:var(--sans);font-size:.8rem;border:none;background:var(--ground);color:var(--ink-2);padding:.36rem .7rem;cursor:pointer}
+.seg button.on{background:var(--accent);color:#fff}
+.hint{font-family:var(--sans);font-size:.78rem;color:var(--muted)}
+.sliderrow{display:flex;align-items:center;gap:.7rem;font-family:var(--sans);font-size:.8rem;color:var(--ink-2)}
+.sliderrow input{flex:1}
+.sliderrow .val{color:var(--accent-ink);font-weight:640;font-variant-numeric:tabular-nums;min-width:3.4em;text-align:right}
+.tokrow{display:flex;flex-wrap:wrap;gap:5px;align-items:stretch;font-family:var(--mono);font-size:.8rem}
+.tok{padding:.32rem .5rem;border-radius:7px;border:1px solid var(--line-2);background:var(--ground);white-space:nowrap;transition:transform .12s,background .2s,color .2s,border-color .2s;cursor:default}
+.tok:hover{transform:translateY(-2px)}
+.tok.sup{background:var(--good-soft);border-color:color-mix(in srgb,var(--good) 45%,transparent);color:var(--good)}
+.tok.msk{color:var(--muted)}
+.tok.img{background:var(--img-soft);border-color:color-mix(in srgb,var(--img) 45%,transparent);color:var(--img)}
+.imgband{flex:1;min-width:120px;display:flex;align-items:center;justify-content:center;border-radius:7px;color:#fff;font-family:var(--sans);font-size:.74rem;font-weight:600;background:linear-gradient(90deg,var(--img),var(--accent));padding:.35rem}
+.legend{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-family:var(--sans);font-size:.76rem;color:var(--muted);margin-top:.7rem}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+.stats{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.8rem}
+.stat{background:var(--ground);border:1px solid var(--line);border-radius:9px;padding:.5rem .7rem;min-width:82px}
+.stat .k{font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-size:1.15rem;font-weight:640;font-variant-numeric:tabular-nums;color:var(--ink)}
+.stat.accent .v{color:var(--accent-ink)}
+.eq{font-family:var(--serif);text-align:center;margin:1.1rem 0;font-size:1.06rem}
+.frac{color:var(--accent-ink)}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1rem 1.1rem;overflow-x:auto;font-family:var(--mono);font-size:.82rem;line-height:1.55;color:var(--ink-2)}
+pre .c{color:var(--muted)} pre .k{color:var(--accent-ink)} pre .s{color:var(--good)}
+.tbl{width:100%;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem;font-family:var(--sans)}
+th,td{text-align:left;padding:.5rem .7rem;border-bottom:1px solid var(--line)}
+th{font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:640}
+td{font-variant-numeric:tabular-nums;color:var(--ink-2)}
+td b{color:var(--ink)} tr:last-child td{border-bottom:none}
+.pcol{display:grid;grid-template-columns:1fr;gap:.7rem}
+@media(min-width:640px){.pcol{grid-template-columns:1fr 1fr}}
+.pbox{border:1px solid var(--line-2);border-radius:10px;overflow:hidden;background:var(--ground)}
+.pbox .ph{font-family:var(--sans);font-size:.74rem;font-weight:640;letter-spacing:.05em;text-transform:uppercase;padding:.45rem .7rem;border-bottom:1px solid var(--line);color:var(--muted)}
+.pbox.tch .ph{color:var(--accent-ink)} .pbox.good .ph{color:var(--good)} .pbox.bad .ph{color:var(--bad)}
+.pbody{padding:.7rem;font-family:var(--mono);font-size:.76rem;line-height:1.5;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+.demo{background:var(--good-soft);color:var(--good);border-radius:6px;padding:.2rem .3rem;transition:opacity .3s;display:block;margin-top:.3rem}
+.demo.hidden{opacity:.14;filter:grayscale(1)}
+.diffwrong{background:var(--bad-soft);color:var(--bad);border-radius:4px;padding:0 .15em}
+.diffok{background:var(--good-soft);color:var(--good);border-radius:4px;padding:0 .15em}
+.barwrap{width:100%;overflow-x:auto}
+svg,canvas{max-width:100%;height:auto;display:block}
+.reveal{opacity:1}
+html.js .reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+html.js .reveal.in{opacity:1;transform:none}
+details.deep{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;background:color-mix(in srgb,var(--accent-soft) 40%,var(--ground));margin:1.2rem 0;padding:0 1rem}
+details.deep>summary{font-family:var(--sans);font-size:.86rem;font-weight:600;color:var(--accent-ink);cursor:pointer;padding:.7rem 0;list-style:none;display:flex;align-items:center;gap:.5rem}
+details.deep>summary::-webkit-details-marker{display:none}
+details.deep>summary::before{content:"▸";display:inline-block;transition:transform .2s;color:var(--accent)}
+details.deep[open]>summary::before{transform:rotate(90deg)}
+details.deep>summary:hover{color:var(--accent)}
+details.deep .dbody{padding:0 0 1rem;font-size:.96rem}
+details.deep .dbody>*:first-child{margin-top:0}
+.callout{border:1px solid var(--line);border-left:3px solid var(--amber);background:color-mix(in srgb,var(--amber-soft) 45%,var(--ground));border-radius:0 10px 10px 0;padding:.8rem 1rem;margin:1.3rem 0;font-size:.95rem}
+.callout .ct{font-family:var(--sans);font-size:.72rem;font-weight:640;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin-bottom:.3rem}
+.take{border:1px solid var(--line);border-left:3px solid var(--good);background:color-mix(in srgb,var(--good-soft) 40%,var(--ground));border-radius:0 10px 10px 0;padding:.8rem 1rem;margin:1.3rem 0;font-size:.95rem}
+.take .ct{font-family:var(--sans);font-size:.72rem;font-weight:640;letter-spacing:.08em;text-transform:uppercase;color:var(--good);margin-bottom:.3rem}
+.patchwrap{position:relative;display:inline-block;line-height:0}
+.patchwrap img{border-radius:8px;display:block}
+.patchgrid{position:absolute;inset:0}
+.glossary dt{font-family:var(--sans);font-weight:640;font-size:.9rem;color:var(--ink);margin-top:.7rem}
+.glossary dd{margin:.1rem 0 0;font-size:.92rem;color:var(--ink-2)}
+.appendix{margin-top:2rem}
+kbd,.kbd{font-family:var(--mono);background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:.02em .38em;font-size:.82em}
+footer{margin:4rem 0 3rem;padding-top:1.6rem;border-top:1px solid var(--line);color:var(--muted);font-family:var(--sans);font-size:.85rem}
+footer a{color:var(--accent-ink)}
+#block-stack{display:flex;flex-direction:column;gap:6px;min-width:200px}
+.blkstage{font-family:var(--mono);font-size:.78rem;padding:.5rem .7rem;border-radius:8px;border:1px solid var(--line-2);background:var(--ground);cursor:pointer;text-align:center;transition:transform .12s,border-color .2s,box-shadow .2s}
+.blkstage:hover{transform:translateX(3px)}
+.blkstage.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.blkstage.attn{border-left:4px solid var(--accent)}
+.blkstage.mlp{border-left:4px solid var(--amber)}
+.blkstage.norm{border-left:4px solid var(--muted)}
+.blkstage.add{border-left:4px solid var(--good);color:var(--good)}
+.blkstage.residual{border-left:4px solid var(--ink-2);font-weight:640}
+#block-desc{flex:1;min-width:210px;background:var(--ground);border:1px solid var(--line);border-radius:10px;padding:.8rem .9rem;font-size:.92rem;color:var(--ink-2);align-self:flex-start}
+#block-desc .fig-title{color:var(--accent-ink)}
+.pbar{display:flex;height:30px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.pseg{min-width:2px;transition:flex .5s ease}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}html.js .reveal{opacity:1;transform:none}}
+</style></head><body><div class="topbar"><div class="wrap">
+  <span class="brand">nano<span class="dot">·</span>VLM &nbsp;workshop</span>
+  <span class="spacer"></span>
+  <button class="themebtn" id="themebtn" aria-label="Toggle color theme">◐ theme</button>
+</div><div class="tprog" id="tprog"></div></div>
+
+<nav class="toc" id="toc" aria-label="Table of contents"></nav>
+
+<main class="wrap"><div class="col">
+
+<header class="hero">
+  <div class="eyebrow">Interactive workshop companion · in-depth edition</div>
+  <h1>Anatomy of a vision-language model — and how to teach it</h1>
+  <p class="dek">A small VLM is a plain language model with one trick bolted on. This post opens that
+  trick all the way up — with real math, live widgets, and the actual training curves — then walks the
+  four ways you post-train the result.</p>
+  <div class="meta">
+    <span><b>Part I</b> · building a VLM (nanoVLM, 222M)</span>
+    <span><b>Part II</b> · training it (SFT · GRPO · distillation · self-distillation)</span>
+  </div>
+  <div class="readtime">≈20 min main path · every <b style="color:var(--accent-ink)">▸ Go deeper</b> block and the
+  appendix are optional depth you can expand.</div>
+</header>
+
+<p>Two companion notebooks power a hands-on VLM workshop. The first asks <em>how is a vision-language
+model built?</em> The second asks <em>once you have one, how do you teach it a task?</em> This article
+stitches both into one read. The main text is the story; the collapsible depth blocks hold the
+derivations, the engineering, and the heavier interactives. Every figure runs the same idea the real
+code runs — hover, drag, and press things.</p>
+
+<figure class="fig reveal" id="fig-splice">
+  <div class="fig-title">the one idea · embedding splice</div>
+  <p style="margin:.1rem 0 .7rem;font-size:.92rem;color:var(--ink-2)">A language model eats a sequence of
+  <em>token embeddings</em>. A VLM changes almost nothing — it just <strong>overwrites some of those rows
+  with image features</strong>. Toggle it:</p>
+  <div class="controls">
+    <button class="btn pri" id="splice-toggle">Insert the image →</button>
+    <span class="hint" id="splice-hint">Text only — the model sees word embeddings.</span>
+  </div>
+  <div class="tokrow" id="splice-row" style="margin-top:.8rem"></div>
+  <div class="legend">
+    <span><i class="sw" style="background:var(--img)"></i> image vectors (one per <code>&lt;image&gt;</code>)</span>
+    <span><i class="sw" style="background:var(--line-2)"></i> text token embeddings</span>
+  </div>
+  <figcaption>Both kinds of vector have the same width (<b>576</b> here). Once the image tokens are spliced
+  in where the <code>&lt;image&gt;</code> placeholders were, the decoder can't tell which rows came from
+  pixels — it just runs.</figcaption>
+</figure>
+
+<!-- ================= PART I ================= -->
+<div class="partdiv" id="part1">
+  <div class="eyebrow">Part I</div>
+  <h2>Building a VLM from a plain LLM</h2>
+  <p style="color:var(--ink-2)">nanoVLM is ~750 lines of pure PyTorch: a ViT image encoder, a SmolLM2
+  language decoder, and a tiny projector that bridges them. We build it bottom-up.</p>
+</div>
+
+<section class="section" id="s1">
+  <div class="snum">Section 1</div>
+  <h2>The splice, precisely</h2>
+  <aside class="mn"><span class="mn-num">§1</span>The whole multimodal change lives in one method,
+  <code>_replace_img_tokens_with_embd</code>: build a boolean mask of image-token positions and copy the
+  projected image vectors into exactly those rows.</aside>
+  <p>A decoder LLM maps <code>token ids → embeddings [B,T,D] → transformer blocks → logits</code>. To make
+  it multimodal you reserve a placeholder token, <code>&lt;image&gt;</code>, repeat it 64 times per image,
+  and after embedding the text you overwrite those 64 rows with 64 vectors made from the pixels. The
+  decoder is untouched.</p>
+  <p>One flag makes it work: nanoVLM's language model has an <code>lm_use_tokens</code> switch. As a normal
+  LLM it takes token ids and returns logits; as a <em>VLM backbone</em> it takes <em>embeddings</em> and
+  returns hidden states — so you can feed it a mix of text and image vectors.</p>
+  <details class="deep"><summary>Go deeper: trace the shapes through one forward</summary><div class="dbody">
+    <div class="controls"><button class="btn" id="trace-step">Step →</button>
+      <button class="btn" id="trace-reset">reset</button></div>
+    <div class="tokrow" id="trace-out" style="font-size:.78rem"></div>
+    <p class="hint" style="margin-top:.5rem">Batch B=2, sequence T=512, width D=576, 64 image tokens/image.
+    The head is applied only to compute the loss; a VLM backbone otherwise stays in embedding space.</p>
+  </div></details>
+</section>
+
+<section class="section" id="s2">
+  <div class="snum">Section 2</div>
+  <h2>The language backbone</h2>
+  <aside class="mn"><span class="mn-num">§2</span>The static config ships placeholder dims (960 / 15
+  heads / 32 layers). <code>from_pretrained</code> overwrites them to the real SmolLM2-135M:
+  <b>576 / 9 heads / 30 layers</b>. The checkpoint is the source of truth for shape.</aside>
+  <p>The backbone is a modern (Llama-style) decoder: RMSNorm, rotary positions, grouped-query attention,
+  a gated MLP, and a tied head. The engine of every block is <strong>self-attention</strong>:</p>
+  <math display="block"><mrow><mi>Attention</mi><mo>(</mo><mi>Q</mi><mo>,</mo><mi>K</mi><mo>,</mo><mi>V</mi><mo>)</mo><mo>=</mo><mi>softmax</mi><mo>(</mo><mfrac><mrow><mi>Q</mi><msup><mi>K</mi><mi>⊤</mi></msup></mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mfrac><mo>)</mo><mspace width="0.15em"/><mi>V</mi></mrow></math>
+  <p>Each token forms a query <math><mi>Q</mi></math>; it scores every token it may attend to via a dot
+  product with their keys <math><mi>K</mi></math>, softmaxes those scores into weights, and mixes their
+  values <math><mi>V</mi></math>. In the <em>decoder</em> a causal mask forbids looking right; in the
+  <em>ViT</em> (Part I §3) there's no mask — vision is bidirectional. See it:</p>
+  <figure class="fig reveal" id="fig-attn">
+    <div class="fig-title">attention · who attends to whom</div>
+    <div class="controls">
+      <div class="seg"><button id="attn-causal" class="on">causal (decoder)</button><button id="attn-bidi">bidirectional (ViT)</button></div>
+      <span class="hint">rows = queries · columns = keys · brightness = attention weight</span>
+    </div>
+    <canvas id="attn-canvas" width="360" height="360" style="margin-top:.7rem;image-rendering:pixelated;width:min(360px,100%);border-radius:8px"></canvas>
+    <figcaption>The lower-triangular wall in causal mode is the "can't see the future" constraint that makes
+    generation autoregressive. Flip to bidirectional and every patch sees every patch.</figcaption>
+  </figure>
+
+  <h3>Rotary positions (RoPE)</h3>
+  <p>There are no learned position vectors. Each query/key is <em>rotated</em> by an angle proportional to
+  its position, so an attention score depends only on the <em>relative</em> distance between two tokens.</p>
+  <figure class="fig reveal" id="fig-rope">
+    <div class="fig-title">rope · position is rotation (2-D illustration)</div>
+    <div style="display:flex;gap:1.1rem;flex-wrap:wrap;align-items:center">
+      <svg id="rope-svg" width="188" height="188" viewBox="0 0 188 188" role="img" aria-label="rotating vector"></svg>
+      <div style="flex:1;min-width:180px">
+        <div class="sliderrow" style="margin-bottom:.5rem">position <input type="range" id="rope-range" min="0" max="12" value="3"><span class="val" id="rope-p">3</span></div>
+        <div class="stats">
+          <div class="stat"><div class="k">score(0,2)</div><div class="v" id="rope-a">—</div></div>
+          <div class="stat"><div class="k">score(5,7)</div><div class="v" id="rope-b">—</div></div>
+        </div>
+        <p class="hint" style="margin:.6rem 0 0">Same gap (2 apart) → same score, anywhere. That
+        relative-distance property <em>is</em> RoPE.</p>
+      </div>
+    </div>
+  </figure>
+  <details class="deep"><summary>Go deeper: the rotation, written out</summary><div class="dbody">
+    <p>RoPE applies a position-dependent rotation to <math><mi>q</mi></math> and <math><mi>k</mi></math>
+    before the dot product. In 2-D, for position <math><mi>m</mi></math> and frequency <math><mi>ω</mi></math>:</p>
+    <math display="block"><mrow><msub><mi>q</mi><mi>m</mi></msub><mo>=</mo><mrow><mo>(</mo><mtable><mtr><mtd><mi>cos</mi><mi>mω</mi></mtd><mtd><mo>−</mo><mi>sin</mi><mi>mω</mi></mtd></mtr><mtr><mtd><mi>sin</mi><mi>mω</mi></mtd><mtd><mi>cos</mi><mi>mω</mi></mtd></mtr></mtable><mo>)</mo></mrow><mi>q</mi></mrow></math>
+    <p>The code realizes this as <code>q·cos + rotate_half(q)·sin</code>. The magic: for two positions
+    <math><mi>m</mi></math>, <math><mi>n</mi></math> the rotated dot product depends only on
+    <math><mrow><mi>m</mi><mo>−</mo><mi>n</mi></mrow></math> — so the model generalizes to relative offsets
+    it never saw at those absolute indices.</p>
+  </div></details>
+
+  <h3>Grouped-query attention</h3>
+  <p>Full attention keeps one key/value per query head. GQA keeps <em>fewer</em> KV heads and shares them
+  across groups of query heads — big cache savings for almost no quality loss. SmolLM2-135M uses
+  <strong>9 query heads served by 3 KV heads</strong>.</p>
+  <figure class="fig reveal" id="fig-gqa">
+    <div class="fig-title">gqa · 9 queries share 3 key/value heads</div>
+    <svg id="gqa-svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="grouped query attention"></svg>
+  </figure>
+
+  <h3 id="s25">The attention-variants landscape</h3>
+  <p>GQA is one point on a spectrum that trades KV-cache size against expressiveness. The cache is what you
+  must store per token to avoid recomputation (§2 KV-cache); shrinking it is the difference between a model
+  that serves long contexts cheaply and one that doesn't.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Variant</th><th>KV heads</th><th>Idea</th><th>Seen in</th></tr></thead>
+    <tbody>
+      <tr><td><b>MHA</b></td><td>= query heads</td><td>every head its own K,V — most expressive, biggest cache</td><td>GPT-2, original ViT</td></tr>
+      <tr><td><b>MQA</b></td><td>1</td><td>all queries share one K,V — smallest cache, some quality loss</td><td>PaLM, Falcon</td></tr>
+      <tr><td><b>GQA</b></td><td>a few groups</td><td>the middle ground — <b>SmolLM2, Qwen, Llama</b></td><td>most modern LLMs</td></tr>
+      <tr><td><b>MLA</b></td><td>latent</td><td>cache a small <em>compressed</em> latent, up-project per head at use</td><td>DeepSeek-V2/V3</td></tr>
+      <tr><td><b>Sliding-window</b></td><td>local</td><td>each token attends to a fixed window — cache bounded by window, not context</td><td>Mistral, Gemma</td></tr>
+      <tr><td><b>FlashAttention</b></td><td>—</td><td>not a variant but an <em>IO-aware kernel</em>: same math, tiled to stay in SRAM (this repo's <code>flash-attn</code>)</td><td>~everyone</td></tr>
+    </tbody>
+  </table></div>
+  <figure class="fig reveal" id="fig-kvsize">
+    <div class="fig-title">kv-cache size · MHA vs MQA vs GQA vs MLA</div>
+    <div class="sliderrow">context length <input type="range" id="kvsize-range" min="512" max="131072" step="512" value="8192"><span class="val" id="kvsize-val">8192</span></div>
+    <svg id="kvsize-svg" width="520" height="150" viewBox="0 0 520 150" style="margin-top:.6rem" role="img" aria-label="kv cache size comparison"></svg>
+    <figcaption>Same 30-layer / 9-head / 64-dim model, bf16. GQA (3 KV heads) is <b>3×</b> smaller than MHA;
+    MLA compresses further to a single latent. This is why long-context serving lives or dies on the
+    attention variant.</figcaption>
+  </figure>
+  <details class="deep"><summary>Go deeper: MLA and FlashAttention, a little more carefully</summary><div class="dbody">
+    <p><b>MLA (Multi-head Latent Attention, DeepSeek).</b> Instead of caching K and V per head, MLA caches a
+    single low-rank <em>latent</em> <math><msub><mi>c</mi><mi>t</mi></msub></math> per token and reconstructs
+    each head's K,V by up-projection at attention time. The cache shrinks to the latent width (often
+    &lt;10% of MHA) while keeping near-MHA quality — it decouples <em>cache size</em> from <em>head count</em>.
+    It pairs with a RoPE-compatible split so positions still work.</p>
+    <p><b>FlashAttention</b> changes <em>nothing</em> mathematically — it computes the exact same softmax.
+    What it changes is memory traffic: the naive kernel materializes the full
+    <math><mrow><mi>T</mi><mo>×</mo><mi>T</mi></mrow></math> score matrix in slow HBM; FlashAttention tiles
+    Q/K/V, keeps the running softmax in fast on-chip SRAM, and never writes the big matrix out. Result:
+    linear memory in <math><mi>T</mi></math> and a large speedup — which is why enabling
+    <code>attn_implementation="flash_attention_2"</code> (as this repo's SFT does) matters even though the
+    outputs are identical.</p>
+  </div></details>
+
+  <h3>The KV-cache</h3>
+  <p>Generating one token at a time, you don't re-attend over the whole prefix each step. The cache stores
+  past keys/values so a new token computes only its own K/V and attends against the stored ones.</p>
+  <figure class="fig reveal" id="fig-kv">
+    <div class="fig-title">kv-cache · constant work per new token</div>
+    <div class="controls">
+      <button class="btn" id="kv-prefill">Prefill 4 tokens</button>
+      <button class="btn pri" id="kv-add">+ generate 1</button>
+      <button class="btn" id="kv-reset">reset</button>
+    </div>
+    <svg id="kv-svg" width="520" height="92" viewBox="0 0 520 92" role="img" aria-label="growing kv cache"></svg>
+    <figcaption id="kv-cap">Cache empty. Prefill runs the prompt once; each generated token then appends a
+    single column and reads the rest — <b>O(1)</b> new compute per step instead of O(T).</figcaption>
+  </figure>
+
+  <h3 id="s2block">The block, assembled</h3>
+  <aside class="mn"><span class="mn-num">§2</span>Every sub-layer reads from and writes back to a shared
+  <em>residual stream</em>. Because each only <em>adds</em> to it, gradients flow straight down the skip
+  path — the reason a 30-layer transformer trains at all.</aside>
+  <p>Attention is only half a block. The full unit — repeated 30 times — is two <strong>pre-norm residual</strong>
+  sub-layers: normalize, transform, add back.</p>
+  <pre>res = x;  x = res + <span class="k">attn</span>(<span class="k">rmsnorm</span>(x), cos, sin, mask)   <span class="c"># attention sub-layer</span>
+res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x))                    <span class="c"># feed-forward sub-layer</span></pre>
+  <p>The second sub-layer is a <strong>gated MLP (SwiGLU)</strong>: two parallel projections up to a wider
+  dimension, one passed through a SiLU gate, multiplied elementwise, then projected back down:</p>
+  <math display="block"><mrow><mi>SwiGLU</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>W</mi><mi>down</mi></msub><mo>(</mo><mi>SiLU</mi><mo>(</mo><msub><mi>W</mi><mi>gate</mi></msub><mi>x</mi><mo>)</mo><mo>⊙</mo><msub><mi>W</mi><mi>up</mi></msub><mi>x</mi><mo>)</mo></mrow></math>
+  <p>The gate lets the network modulate its own signal per-channel — and this MLP is where <em>most</em> of a
+  block's parameters live (see the budget in §6). Click through a block:</p>
+  <figure class="fig reveal" id="fig-block">
+    <div class="fig-title">transformer block · click a stage</div>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap">
+      <div id="block-stack"></div>
+      <div id="block-desc"></div>
+    </div>
+    <figcaption>Shape is <b>[B, T, 576]</b> in and out — every block is a same-shape refinement of the
+    residual stream. Stack 30 and you have the decoder.</figcaption>
+  </figure>
+  <details class="deep"><summary>Go deeper: the residual stream as a communication channel</summary><div class="dbody">
+    <p>A useful mental model: the residual stream is a shared bus of width 576 that every layer reads from and
+    writes to. Attention <em>moves</em> information between token positions; the MLP <em>processes</em> it
+    within a position. Because writes are additive, later layers can read what earlier layers deposited, and a
+    sub-layer that has nothing to add can output ~0 and leave the stream unchanged. Pre-norm (normalizing the
+    <em>input</em> to each sub-layer, not its output) keeps the stream's scale from exploding across depth,
+    which is what makes very deep stacks trainable without careful warmup tricks.</p>
+  </div></details>
+  <details class="deep"><summary>Go deeper: embeddings, weight tying &amp; the extended vocabulary</summary><div class="dbody">
+    <p>The first and last layers are a matched pair. The <b>token embedding</b> is a lookup table
+    <math><mrow><mo>[</mo><mi>vocab</mi><mo>×</mo><mn>576</mn><mo>]</mo></mrow></math> turning ids into vectors;
+    the <b>head</b> projects the final hidden state back to <math><mrow><mo>[</mo><mn>576</mn><mo>×</mo><mi>vocab</mi><mo>]</mo></mrow></math>
+    logits. nanoVLM <em>ties</em> them — <code>head.weight = token_embedding.weight</code> — halving those
+    28M parameters and coupling "how a token looks going in" with "how it's scored coming out".</p>
+    <p>To host images, the VLM grafts <b>66 new tokens</b> onto SmolLM2's <b>49,152</b>-token vocabulary
+    (the <code>&lt;image&gt;</code> placeholder plus tile markers), giving <b>49,218</b>. The pretrained rows
+    are copied in; the 66 new rows are freshly initialized and learned during training. The embedding matrix
+    is the one place the "language" model gains genuinely new, vision-specific vocabulary.</p>
+  </div></details>
+</section>
+
+<section class="section" id="s3">
+  <div class="snum">Section 3</div>
+  <h2>The vision backbone</h2>
+  <aside class="mn"><span class="mn-num">§3</span>Unlike the decoder, the ViT attends
+  <em>bidirectionally</em> and uses LayerNorm + learned position embeddings, not RMSNorm + RoPE.</aside>
+  <p>A Vision Transformer (SigLIP2-base/16-256) cuts a 256×256 image into 16×16 patches with a single
+  strided convolution, adds position embeddings, and runs 12 transformer blocks. Out comes
+  <strong>256 patch vectors of width 768</strong>. Here's the grid it sees:</p>
+  <figure class="fig reveal" id="fig-patch">
+    <div class="fig-title">vit · an image is a sequence of 16×16 patches</div>
+    <div class="patchwrap" id="patch-wrap">
+      <img id="patch-img" alt="sample image split into patches" width="288">
+      <svg id="patch-svg" class="patchgrid" viewBox="0 0 288 384" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+    <figcaption>Each cell becomes one 768-dim vector. A 256-wide square makes
+    <math><mrow><mo>(</mo><mn>256</mn><mo>/</mo><mn>16</mn><msup><mo>)</mo><mn>2</mn></msup><mo>=</mo><mn>256</mn></mrow></math>
+    patches — the ViT's "tokens".</figcaption>
+  </figure>
+
+  <h3 id="s3cmp">Same skeleton, different dialect</h3>
+  <p>The vision and language towers share the transformer skeleton but differ in nearly every detail —
+  because images and text have different structure. Reading this table is the fastest way to internalize both
+  architectures at once:</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Aspect</th><th>ViT tower (SigLIP2)</th><th>LLM tower (SmolLM2)</th></tr></thead>
+    <tbody>
+      <tr><td>attention</td><td><b>bidirectional</b> (no mask)</td><td><b>causal</b> (can't see the future)</td></tr>
+      <tr><td>normalization</td><td>LayerNorm</td><td>RMSNorm</td></tr>
+      <tr><td>positions</td><td>learned, <em>added</em> to patches</td><td>RoPE (rotary, relative)</td></tr>
+      <tr><td>feed-forward</td><td>GELU MLP (fc1 → fc2)</td><td>SwiGLU (gate ⊙ up → down)</td></tr>
+      <tr><td>heads</td><td>12, full MHA</td><td>9 query / 3 KV (GQA)</td></tr>
+      <tr><td>width · depth</td><td>768 · 12 blocks</td><td>576 · 30 blocks</td></tr>
+      <tr><td>token 0</td><td>no CLS — all 256 patches kept</td><td>first text token</td></tr>
+      <tr><td>pretraining</td><td>image–text sigmoid contrastive</td><td>next-token on text</td></tr>
+    </tbody>
+  </table></div>
+  <p>And the vision tower is specifically <strong>SigLIP2</strong>. Where CLIP's contrastive loss softmaxes
+  over every image–text pair in a batch (so the batch is a global normalizer), <strong>SigLIP</strong>
+  replaces it with a simple <em>pairwise sigmoid</em> loss — each pair judged independently. That's cheaper,
+  scales to larger batches, and yields stronger features for small encoders. nanoVLM keeps the
+  <code>vit_cls_flag=False</code> setting: <em>no</em> CLS token, so all 256 patch vectors survive — exactly
+  what the projector needs to preserve the spatial grid.</p>
+  <details class="deep"><summary>Go deeper: patch embedding, and loading pretrained weights into from-scratch code</summary><div class="dbody">
+    <p>The "patchify" step is one <b>strided convolution</b>: a <code>Conv2d</code> with kernel = stride = 16
+    slides over the image, and each output pixel is one patch's 768-dim embedding — <code>[3,256,256] →
+    [768,16,16] →</code> flatten <code>→ [256,768]</code>. No overlap, no separate linear layer.</p>
+    <p>nanoVLM re-implements the ViT and LM from scratch, then <em>loads</em> the pretrained SigLIP2 / SmolLM2
+    weights into its own modules with a name-mapping dict. One wrinkle: HuggingFace stores Q, K, V as three
+    separate matrices, but nanoVLM fuses them into one <code>qkv_proj</code>, so the loader concatenates
+    them: <code>qkv = cat(q_weight, k_weight, v_weight)</code>. This "weight surgery" — mapping names,
+    fusing/splitting projections, extending the embedding for new tokens — is the unglamorous glue that lets
+    a clean from-scratch model inherit a pretrained one.</p>
+  </div></details>
+
+  <p>But the LLM wants width <strong>576</strong>, and 64 vectors per image, not 256. Reconciling
+  <code>(256, 768) → (64, 576)</code> is the projector's job (§4).</p>
+</section>
+
+<section class="section" id="s35">
+  <div class="snum">Section 3.5</div>
+  <h2>Resolution → tokens → compute</h2>
+  <aside class="mn"><span class="mn-num">§3.5</span>Attention cost grows with the <em>square</em> of the
+  token count, so image resolution is a compute dial, not a free quality knob.</aside>
+  <p>How many tokens an image costs is set by resolution and the patch/merge sizes. Drag it:</p>
+  <figure class="fig reveal" id="fig-res">
+    <div class="fig-title">tokens per image · a resolution dial</div>
+    <div class="sliderrow">image side (px) <input type="range" id="res-range" min="128" max="1024" step="16" value="256"><span class="val" id="res-val">256</span></div>
+    <div class="stats" id="res-out"></div>
+    <figcaption>nanoVLM path: patches = (side/16)², then pixel-shuffle ÷4 → image tokens. The receipt VLM
+    (Qwen) uses a <code>max_pixels</code> budget and a 2×2 merge, landing a typical receipt at ~475
+    <code>&lt;image_pad&gt;</code> tokens. Double the side → 4× the tokens → ~16× the attention cost.</figcaption>
+  </figure>
+</section>
+
+<section class="section" id="s4">
+  <div class="snum">Section 4</div>
+  <h2>The bridge: a modality projector</h2>
+  <aside class="mn"><span class="mn-num">§4</span>64 = <code>mp_image_token_length</code> — exactly how many
+  <code>&lt;image&gt;</code> placeholders the data pipeline reserves per image (§5).</aside>
+  <p>Two steps. A <strong>pixel-shuffle</strong> folds each 2×2 block of neighbouring patches into one
+  vector — 256 tokens become 64, width grows 4× (768 → 3072). Then a single <strong>Linear</strong> maps
+  3072 → 576, into the LLM's embedding space. Press <em>fold</em>:</p>
+  <figure class="fig reveal" id="fig-ps">
+    <div class="fig-title">projector · pixel-shuffle folds space into channels</div>
+    <div class="controls"><button class="btn pri" id="ps-btn">Fold ×2</button>
+      <span class="hint" id="ps-hint">16 patches · width 768</span></div>
+    <svg id="ps-svg" width="520" height="230" viewBox="0 0 520 230" role="img" aria-label="pixel shuffle"></svg>
+    <figcaption>Fewer, richer tokens. Full model: <b>256 → 64</b> tokens, width <b>768 → 3072 → 576</b>.
+    The 64 outputs now live in the LLM's embedding space — the "image tokens" the splice drops in.</figcaption>
+  </figure>
+</section>
+
+<section class="section" id="s5">
+  <div class="snum">Section 5</div>
+  <h2>Data &amp; the loss mask</h2>
+  <aside class="mn"><span class="mn-num">§5</span>Under <code>transformers ≥ 5.3</code> the assistant spans
+  must be measured with <code>return_dict=True</code>; missing it silently masks <em>everything</em> to
+  <code>-100</code> and the loss goes <code>nan</code> — a real bug the fork fixed.</aside>
+  <p>A sample is <code>(image, conversation)</code>. The image becomes the placeholder string
+  <code>&lt;image&gt;×64</code> prepended to the user turn; everything is tokenized; then a <strong>loss
+  mask marks only the assistant's answer</strong>. Toggle the mask:</p>
+  <figure class="fig reveal" id="fig-mask1">
+    <div class="fig-title">next-token loss · supervise the answer only</div>
+    <div class="controls"><button class="btn on" id="mask1-toggle" aria-pressed="true">Show supervised tokens</button>
+      <span class="hint">green = a loss is computed · grey = masked (<code>-100</code>)</span></div>
+    <div class="tokrow" id="mask1-row" style="margin-top:.8rem"></div>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--img)"></i> image placeholder</span>
+      <span><i class="sw" style="background:var(--muted)"></i> prompt (masked)</span>
+      <span><i class="sw" style="background:var(--good)"></i> answer (supervised)</span></div>
+  </figure>
+  <h3 id="s55">Where the boundary comes from: the chat template</h3>
+  <p>The mask isn't guessed — it's found. The tokenizer's <em>chat template</em> wraps each turn in role
+  markers, e.g. <code>&lt;|im_start|>user … &lt;|im_end|></code> then
+  <code>&lt;|im_start|>assistant</code>. The collator locates that last assistant marker and supervises
+  everything after it. The special tokens <em>are</em> the supervision boundary.</p>
+  <pre><span class="c"># the completion boundary is a token search, not a heuristic</span>
+start = find_after(input_ids, tokenize(<span class="s">"&lt;|im_start|>assistant\n"</span>))
+labels[:start] = -<span class="s">100</span>          <span class="c"># mask prompt + image + role headers</span>
+labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never train on image placeholders</span></pre>
+</section>
+
+<section class="section" id="s6">
+  <div class="snum">Section 6</div>
+  <h2>Assemble &amp; run the forward pass</h2>
+  <p>Now everything converges: text rows from the embedding, image rows from ViT+projector, the splice, the
+  decoder+head, and a masked cross-entropy over the answer tokens only:</p>
+  <math display="block"><mrow><mi>ℒ</mi><mo>=</mo><mo>−</mo><mfrac><mn>1</mn><mrow><mo>|</mo><mi>𝒮</mi><mo>|</mo></mrow></mfrac><munder><mo>∑</mo><mrow><mi>t</mi><mo>∈</mo><mi>𝒮</mi></mrow></munder><mi>log</mi><mspace width="0.15em"/><msub><mi>p</mi><mi>θ</mi></msub><mo>(</mo><msub><mi>y</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>x</mi><mrow><mo>&lt;</mo><mi>t</mi></mrow></msub><mo>)</mo></mrow></math>
+  <p>where <math><mi>𝒮</mi></math> is the set of supervised (non-<code>-100</code>) positions. On an
+  untrained projector the loss is finite (≈ the log-vocab baseline), not <code>nan</code> — the pipeline
+  works. And it <em>learns</em>: overfit a handful of samples and the loss collapses toward zero.</p>
+  <figure class="fig reveal" id="fig-overfit">
+    <div class="fig-title">sanity check · loss on a tiny fixed batch</div>
+    <svg id="overfit-svg" width="520" height="170" viewBox="0 0 520 170" role="img" aria-label="overfit loss curve"></svg>
+    <figcaption>Eight steps on two samples (from the workshop notebook): <b>2.11 → 0.02</b>. The wiring is
+    correct; real training just does this at scale on real data.</figcaption>
+  </figure>
+
+  <h3>Where the 222M parameters live</h3>
+  <p>"Small" is worth making concrete. The parameters split unevenly across the three components — and within
+  a decoder block, the gated MLP dwarfs attention:</p>
+  <figure class="fig reveal" id="fig-budget">
+    <div class="fig-title">parameter budget · 222M total</div>
+    <div id="budget-host"></div>
+    <figcaption>The <b>LM</b> (135M) and <b>ViT</b> (86M) are almost the whole model; the projector that
+    bridges them is under <b>1%</b>. Inside a block, <b>75%</b> of the weights are in the SwiGLU MLP — which
+    is exactly why a <em>fused</em> cross-entropy and gradient checkpointing (Part II §7) pay off, and why
+    LoRA (§LoRA) targets both the attention <em>and</em> MLP projections.</figcaption>
+  </figure>
+</section>
+
+<section class="section" id="sL">
+  <div class="snum">Interlude · used throughout Part II</div>
+  <h2>LoRA: training 1% of the weights</h2>
+  <aside class="mn"><span class="mn-num">LoRA</span>Every method in Part II trains a LoRA adapter, not the
+  full model — so a 4B model fine-tunes on one GPU and each experiment is a ~50 MB file, not 8 GB.</aside>
+  <p>Full fine-tuning updates all billions of weights. <strong>LoRA</strong> freezes them and learns a small
+  low-rank update beside each target matrix: for a frozen <math><mi>W</mi></math>, train
+  <math><mi>A</mi></math> and <math><mi>B</mi></math> with rank <math><mi>r</mi></math> and use</p>
+  <math display="block"><mrow><msup><mi>W</mi><mi>′</mi></msup><mo>=</mo><mi>W</mi><mo>+</mo><mfrac><mi>α</mi><mi>r</mi></mfrac><mspace width="0.15em"/><mi>B</mi><mi>A</mi><mo>,</mo><mspace width="0.6em"/><mi>B</mi><mo>∈</mo><msup><mi>ℝ</mi><mrow><mi>d</mi><mo>×</mo><mi>r</mi></mrow></msup><mo>,</mo><mspace width="0.3em"/><mi>A</mi><mo>∈</mo><msup><mi>ℝ</mi><mrow><mi>r</mi><mo>×</mo><mi>k</mi></mrow></msup></mrow></math>
+  <p>Since <math><mrow><mi>r</mi><mo>≪</mo><mi>d</mi><mo>,</mo><mi>k</mi></mrow></math>, the trainable count is
+  tiny. Slide the rank and watch it:</p>
+  <figure class="fig reveal" id="fig-lora">
+    <div class="fig-title">lora · rank vs. trainable parameters</div>
+    <div class="sliderrow">rank r <input type="range" id="lora-range" min="1" max="256" step="1" value="32"><span class="val" id="lora-val">32</span></div>
+    <div class="stats" id="lora-out"></div>
+    <figcaption>Targets = <code>q,k,v,o,gate,up,down</code> across all layers (this repo's
+    <code>LORA_TARGETS</code>). At <code>r=32</code> you train well under 2% of the model and can
+    <code>merge_and_unload()</code> the adapter back into <math><mi>W</mi></math> for zero-overhead inference.</figcaption>
+  </figure>
+</section>
+
+<!-- ================= PART II ================= -->
+<div class="partdiv" id="part2">
+  <div class="eyebrow">Part II</div>
+  <h2>Four ways to teach a VLM</h2>
+  <p style="color:var(--ink-2)">Switch tasks: fine-tune a <strong>Qwen3.5-4B</strong> VLM to turn a receipt
+  photo into structured JSON. Same task, four training signals — each a real script, each evaluated the
+  same way. We'll thread one receipt through all of them.</p>
+  <div class="tbl" style="margin-top:1rem"><table>
+    <thead><tr><th>Method</th><th>One-line idea</th><th>Learns from</th></tr></thead>
+    <tbody>
+      <tr><td><b>SFT</b></td><td>imitate the gold answer</td><td>gold JSON tokens</td></tr>
+      <tr><td><b>GRPO</b></td><td>sample answers, reward the good ones</td><td>a scalar reward</td></tr>
+      <tr><td><b>Distillation</b></td><td>copy a bigger teacher into a smaller student</td><td>the teacher's distribution</td></tr>
+      <tr><td><b>Self-distillation</b></td><td>let the model teach itself from a demo</td><td>its own adapter-off distribution</td></tr>
+    </tbody>
+  </table></div>
+  <figure class="fig reveal" id="fig-receipt" style="text-align:center">
+    <div class="fig-title" style="justify-content:center">the running example</div>
+    <img id="receipt-img" alt="a scanned receipt" width="230" style="border-radius:8px;border:1px solid var(--line)">
+    <figcaption id="receipt-cap" style="text-align:left"></figcaption>
+  </figure>
+</div>
+
+<section class="section" id="s7">
+  <div class="snum">Section 7 · SFT</div>
+  <h2>Supervised fine-tuning</h2>
+  <p>Same recipe as §5, new task: show the model <code>(receipt, prompt) → gold JSON</code> and train it to
+  reproduce the gold tokens — same completion-only, vision-masked loss, now as a LoRA adapter (§LoRA).</p>
+  <figure class="fig reveal" id="fig-mask2">
+    <div class="fig-title">sft · only the JSON answer carries a loss</div>
+    <div class="controls"><button class="btn on" id="mask2-toggle" aria-pressed="true">Show supervised tokens</button>
+      <span class="hint">the receipt image + instruction + schema are all masked</span></div>
+    <div class="tokrow" id="mask2-row" style="margin-top:.8rem"></div>
+  </figure>
+  <h3>What a training run actually looks like</h3>
+  <p>The loop is standard but the settings matter: a warmup-then-cosine learning rate, bf16, gradient
+  accumulation to fake a big batch, gradient checkpointing to fit memory, and a <em>fused</em>
+  cross-entropy so the 248k-token vocabulary logits never fully materialize.</p>
+  <figure class="fig reveal" id="fig-sftcurves">
+    <div class="fig-title">real run · SFT loss &amp; the LR schedule</div>
+    <div class="pcol">
+      <div><svg id="sftloss-svg" width="250" height="150" viewBox="0 0 250 150" role="img" aria-label="sft loss"></svg>
+        <div class="hint" style="text-align:center">train loss · 270 steps</div></div>
+      <div><svg id="sftlr-svg" width="250" height="150" viewBox="0 0 250 150" role="img" aria-label="lr schedule"></svg>
+        <div class="hint" style="text-align:center">learning rate · warmup + cosine</div></div>
+    </div>
+    <figcaption>Real telemetry from the workshop's SFT run (Qwen3.5-4B, LoRA r=32). Loss
+    <b>0.20 → 0.005</b>; the LR ramps for 3% of steps then cosine-decays.</figcaption>
+  </figure>
+  <details class="deep"><summary>Go deeper: why liger fused cross-entropy, and gradient checkpointing</summary><div class="dbody">
+    <p>The last layer projects each of ~thousands of positions to a <b>248,077</b>-way vocabulary. Storing
+    those logits <em>and</em> their softmax gradients is gigabytes. A <b>fused</b> CE (liger kernel) computes
+    the loss and gradient in chunks without ever holding the full logits tensor — often the difference
+    between fitting and OOM on a 4B VLM. <b>Gradient checkpointing</b> trades compute for memory the other
+    way: it discards activations on the forward pass and recomputes them during backward, cutting activation
+    memory at ~30% more compute. (GRPO/GKD sometimes turn it <em>off</em> because it disables the KV-cache
+    during on-policy generation, which is far more expensive.)</p>
+  </div></details>
+  <div class="take"><div class="ct">result</div>SFT does most of the work. Macro <b>pair_f1</b> jumps
+  <b>0.795 → 0.900</b> on the 4B; a raw Gemma base that emits <em>zero</em> valid JSON goes
+  <b>0.00 → 0.86</b>.</div>
+  <pre><span class="c"># full run stays in the script</span>
+python train/sft.py --datasets sroie,cord --report-to none</pre>
+</section>
+
+<section class="section" id="s8">
+  <div class="snum">Section 8 · GRPO</div>
+  <h2>Reinforcement learning from a local reward</h2>
+  <aside class="mn"><span class="mn-num">§8</span>The reward is <b>deterministic and local</b> — no LLM
+  judge. Every JSON is flattened to a multiset of <code>(leaf-key, value)</code> pairs, making SROIE's flat
+  fields and CORD's nested items comparable with one code path.</aside>
+  <p>SFT imitates one gold answer. GRPO samples several completions per prompt, <strong>scores each with a
+  reward</strong>, and pushes the policy toward the above-average ones. The reward blends validity, field
+  coverage, and value correctness:</p>
+  <div class="eq"><span class="frac">0.30</span>·parsable + <span class="frac">0.50</span>·field_f1 + <span class="frac">0.20</span>·value_acc</div>
+  <p>Type a prediction and watch it — the scoring is the exact trainer algorithm, ported to JavaScript:</p>
+  <figure class="fig reveal" id="fig-reward">
+    <div class="fig-title">grpo · live reward calculator</div>
+    <div class="controls"><span class="hint">presets:</span>
+      <button class="btn" data-preset="perfect">perfect</button>
+      <button class="btn" data-preset="partial">partial</button>
+      <button class="btn" data-preset="wrong">wrong values</button>
+      <button class="btn" data-preset="garbage">not JSON</button></div>
+    <div class="pcol" style="margin-top:.6rem">
+      <div class="pbox"><div class="ph">gold target (fixed)</div>
+        <textarea id="rw-gold" spellcheck="false" readonly style="width:100%;border:none;background:transparent;color:var(--ink-2);font-family:var(--mono);font-size:.76rem;line-height:1.5;padding:.7rem;min-height:150px;resize:vertical"></textarea></div>
+      <div class="pbox tch"><div class="ph">model prediction (editable)</div>
+        <textarea id="rw-pred" spellcheck="false" style="width:100%;border:none;background:transparent;color:var(--ink);font-family:var(--mono);font-size:.76rem;line-height:1.5;padding:.7rem;min-height:150px;resize:vertical"></textarea></div>
+    </div>
+    <div class="stats" style="margin-top:.8rem">
+      <div class="stat"><div class="k">parsable</div><div class="v" id="rw-parse">—</div></div>
+      <div class="stat"><div class="k">field_f1</div><div class="v" id="rw-field">—</div></div>
+      <div class="stat"><div class="k">value_acc</div><div class="v" id="rw-value">—</div></div>
+      <div class="stat accent"><div class="k">reward</div><div class="v" id="rw-total">—</div></div></div>
+    <svg id="rw-bar" width="520" height="30" viewBox="0 0 520 30" style="margin-top:.7rem" aria-hidden="true"></svg>
+  </figure>
+  <p>The scalar becomes a gradient through the <strong>group-relative advantage</strong>: for a group of
+  <math><mi>G</mi></math> completions, normalize each reward within the group,</p>
+  <math display="block"><mrow><msub><mi>A</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>−</mo><mi>mean</mi><mo>(</mo><mi>r</mi><mo>)</mo></mrow><mrow><mi>std</mi><mo>(</mo><mi>r</mi><mo>)</mo></mrow></mfrac></mrow></math>
+  <p>and push up the tokens of above-average completions, down the below-average ones. No gold tokens, no
+  KL term (this repo runs <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math>, so no reference model).
+  Here is the mechanism — and its failure mode — live:</p>
+  <figure class="fig reveal" id="fig-rollout">
+    <div class="fig-title">grpo · a group of 8, and why it can stall</div>
+    <div class="sliderrow">SFT quality (how good the policy already is) <input type="range" id="rollout-range" min="0" max="100" value="30"><span class="val" id="rollout-val">30%</span></div>
+    <div class="controls"><button class="btn" id="rollout-resample">↻ resample group</button></div>
+    <svg id="rollout-svg" width="520" height="210" viewBox="0 0 520 210" role="img" aria-label="grpo rollout group"></svg>
+    <div class="stats"><div class="stat"><div class="k">mean reward</div><div class="v" id="rollout-mean">—</div></div>
+      <div class="stat"><div class="k">reward std</div><div class="v" id="rollout-std">—</div></div>
+      <div class="stat accent"><div class="k">usable gradient</div><div class="v" id="rollout-grad">—</div></div></div>
+    <figcaption>Crank "SFT quality" up: the 8 rewards bunch near the top, <b>std → 0</b>, every advantage → 0,
+    and the gradient vanishes. A strong SFT starting point <em>saturates</em> the reward.</figcaption>
+  </figure>
+  <p>That isn't a thought experiment — it's what the real run shows. The reward starts near 0.99 and the
+  fraction of prompts with <em>zero</em> reward variance climbs to 100%:</p>
+  <figure class="fig reveal" id="fig-grpocurve">
+    <div class="fig-title">real run · reward saturates, advantage dies</div>
+    <svg id="grpocurve-svg" width="520" height="185" viewBox="0 0 520 185" role="img" aria-label="grpo saturation curves"></svg>
+    <div class="legend"><span><i class="sw" style="background:var(--good)"></i> mean reward</span>
+      <span><i class="sw" style="background:var(--bad)"></i> fraction of groups with zero reward-variance</span></div>
+    <figcaption>Real telemetry, smoothed. The reward is pinned near <b>0.98</b> from step 1; the fraction of
+    8-completion groups where all rewards are identical (zero variance → zero advantage → zero gradient)
+    climbs to <b>100%</b>. The reward has no headroom left for RL to climb.</figcaption>
+  </figure>
+  <div class="callout"><div class="ct">the lesson</div>GRPO moved macro pair_f1 by <b>−0.007</b> here — flat.
+  Not a failure of RL, but of a reward the SFT model already maxes out. RL needs <em>headroom</em> and
+  <em>reward variance</em> to bite. (Distillation, next, gives the small student real headroom — and a real
+  gain.)</div>
+  <details class="deep"><summary>Go deeper: decoding — how those completions are sampled</summary><div class="dbody">
+    <p>Each rollout is autoregressive generation: a multimodal <b>prefill</b> (splice image tokens, run the
+    decoder once to fill the KV-cache) then a <b>decode loop</b> that samples one token at a time. Sampling
+    is shaped by <b>temperature</b> (flattens/sharpens the distribution), <b>top-k</b> (keep the k likeliest),
+    and <b>top-p</b> (keep the smallest set with cumulative prob ≥ p); greedy = argmax. GRPO wants
+    <em>diversity</em> across its 8 samples, so it samples with temperature rather than greedily — low
+    diversity is one more way the advantage collapses.</p>
+  </div></details>
+</section>
+
+<section class="section" id="s9">
+  <div class="snum">Section 9 · Distillation</div>
+  <h2>On-policy distillation (GKD)</h2>
+  <aside class="mn"><span class="mn-num">§9</span>Both models are the same Qwen3.5 family — identical
+  248,077-token vocab and identical image tokenization (a receipt → the same 475 <code>&lt;image_pad&gt;</code>
+  tokens). That's what makes one <code>input_ids</code> scorable by teacher and student.</aside>
+  <p>We have a strong 4B extractor. Can a <strong>5× smaller 0.8B</strong> student inherit most of it? In
+  on-policy GKD the student <em>samples</em> a completion; both student and the frozen 4B teacher score those
+  tokens; and a generalized Jensen–Shannon divergence pulls the student's distribution toward the teacher's.
+  The teacher's <em>full distribution</em> is a far richer signal than one gold label.</p>
+  <p>The <math><mi>β</mi></math> knob picks the divergence's character. See what it does to a student trying
+  to match a two-mode teacher:</p>
+  <figure class="fig reveal" id="fig-beta">
+    <div class="fig-title">divergence · forward-KL vs JSD vs reverse-KL</div>
+    <div class="sliderrow">β <input type="range" id="beta-range" min="0" max="100" value="50"><span class="val" id="beta-val">0.50</span></div>
+    <canvas id="beta-canvas" width="520" height="200" style="margin-top:.6rem;width:100%;border-radius:8px"></canvas>
+    <figcaption id="beta-cap"></figcaption>
+  </figure>
+  <math display="block"><mrow><mi>ℒ</mi><mo>=</mo><mi>β</mi><mspace width="0.15em"/><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mspace width="0.15em"/><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math>
+  <p>with <math><mi>t</mi></math> the teacher and <math><mi>s</mi></math> the student distribution over the
+  next token. <math><mrow><mi>β</mi><mo>=</mo><mn>0.5</mn></mrow></math> is the symmetric JS divergence.</p>
+  <figure class="fig reveal" id="fig-gkdloss">
+    <div class="fig-title">real run · student GKD loss (0.8B)</div>
+    <svg id="gkdloss-svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="gkd loss"></svg>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Qwen3.5-0.8B student</th><th>pair_f1</th><th></th></tr></thead>
+    <tbody>
+      <tr><td>base (zero-shot)</td><td><b>0.653</b></td><td class="hint">cold</td></tr>
+      <tr><td>SFT warmup only</td><td><b>0.823</b></td><td class="hint">labels</td></tr>
+      <tr><td>warmup → GKD (400 steps)</td><td><b>0.847</b></td><td class="hint">+0.024 real gain</td></tr>
+      <tr><td>cold base → GKD (1000 steps)</td><td><b>0.810</b></td><td class="hint">label-free</td></tr>
+      <tr><td><em>4B teacher (reference)</em></td><td><em>0.900</em></td><td class="hint">ceiling</td></tr>
+    </tbody>
+  </table></div>
+  <div class="take"><div class="ct">result</div>Distillation gave a <b>real gain</b> where GRPO didn't — the small
+  student had headroom, and the teacher's distribution beat gold labels. On-policy works even from cold
+  (0.653 → 0.810, no labels), but a cheap SFT warmup wins.</div>
+</section>
+
+<section class="section" id="s95">
+  <div class="snum">Section 9.5</div>
+  <h2>Multimodal RoPE — the plumbing nobody warns you about</h2>
+  <aside class="mn"><span class="mn-num">§9.5</span>This is what "RL/distillation on a brand-new VLM"
+  actually looks like: you fix a positional-encoding bug inside someone else's trainer.</aside>
+  <p>A text LLM's RoPE indexes one dimension: position 0,1,2,… But an image is 2-D. Qwen3.5 uses
+  <strong>multimodal RoPE (M-RoPE)</strong>: every token gets a <em>3-D</em> position
+  <math><mrow><mo>(</mo><mi>t</mi><mo>,</mo><mi>h</mi><mo>,</mo><mi>w</mi><mo>)</mo></mrow></math> —
+  temporal, height, width — so image patches carry their grid location and text advances in time. To assign
+  them, the model needs to know which tokens are image tokens, via <code>mm_token_type_ids</code>.</p>
+  <p>Here's the trap. TRL's GRPO and GKD loss paths were written for text and forward the model
+  <em>without</em> <code>mm_token_type_ids</code>; Qwen3.5's <code>get_rope_index</code> then either errors
+  or mis-positions. And you can't just reuse the tensor from generation — the loss runs on
+  <code>cat(prompt, completion)</code>, a different length. The repo's fix recomputes it from the actual
+  <code>input_ids</code> of <em>that</em> forward:</p>
+  <pre><span class="c"># src/vlm_workshop/distill.py — recompute per forward (image pads → 1, text → 0)</span>
+mm_token_type_ids = (input_ids == image_pad_id).long()</pre>
+  <p>It's one line, but finding it is the difference between a run that silently learns nothing and one that
+  works. Multimodal training is mostly this kind of plumbing.</p>
+</section>
+
+<section class="section" id="s10">
+  <div class="snum">Section 10 · Self-distillation</div>
+  <h2>SDFT — the model teaches itself</h2>
+  <aside class="mn"><span class="mn-num">§10</span><code>with model.disable_adapter():</code> is the whole
+  trick — no second model in memory, just the base weights acting as a teacher because they get to
+  <em>see the answer</em>.</aside>
+  <p>Distillation needed a separate teacher. SDFT removes it: the student generates from the plain prompt;
+  the self-teacher is the <em>same</em> model with the LoRA adapter <strong>disabled</strong>, but shown the
+  gold answer <em>in context</em>. Seeing the answer, the base assigns high probability to the right tokens,
+  and a JSD pulls the student toward that. The only difference between the two forwards is the demonstration:</p>
+  <figure class="fig reveal" id="fig-prompt">
+    <div class="fig-title">sdft · student vs. self-teacher prompt</div>
+    <div class="controls"><button class="btn pri" id="pd-toggle">Reveal what only the teacher sees</button></div>
+    <div class="pcol" style="margin-top:.6rem">
+      <div class="pbox"><div class="ph">student prompt</div><div class="pbody">You are a receipt extraction system…
+[receipt image]
+Return ONLY valid JSON matching this schema.
+&lt;assistant&gt; ▍</div></div>
+      <div class="pbox tch"><div class="ph">self-teacher prompt (+ demonstration)</div><div class="pbody">You are a receipt extraction system…
+[receipt image]
+Return ONLY valid JSON matching this schema.<span class="demo hidden" id="pd-demo">
+Here is the correct extraction for reference:
+{"company":"BOOK TA.K","date":"25/12/2018","total":"9.00"}</span>
+&lt;assistant&gt; ▍</div></div>
+    </div>
+    <figcaption>No external teacher, no reward — the supervision is a demonstration re-scored on-policy by the
+    model itself. Its appeal isn't peak score but <b>learning without a teacher model</b> and <b>resisting
+    forgetting</b> (Shenfeld et&nbsp;al., "Self-Distillation Enables Continual Learning").</figcaption>
+  </figure>
+  <figure class="fig reveal" id="fig-sdftloss">
+    <div class="fig-title">real run · SDFT loss (0.8B, self-teacher)</div>
+    <svg id="sdftloss-svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="sdft loss"></svg>
+  </figure>
+</section>
+
+<section class="section" id="s11">
+  <div class="snum">Section 11</div>
+  <h2>All four, side by side</h2>
+  <p>Every stage was evaluated the same way (greedy decode, 100 SROIE + 100 CORD). Headline = macro
+  <em>pair_f1</em> — did it get both the key <em>and</em> the value. Hover a bar:</p>
+  <figure class="fig reveal" id="fig-chart">
+    <div class="fig-title">results · macro pair_f1 across methods</div>
+    <div class="barwrap"><svg id="chart-svg" width="620" height="300" viewBox="0 0 620 300" role="img" aria-label="pair_f1 across methods"></svg></div>
+    <figcaption><b>Dashed line</b> = the 4B SFT teacher (0.90). The 4B (grey→green) barely moves from SFT to
+    GRPO; the 0.8B student (blue→purple) climbs from a weak base through SFT and distillation.</figcaption>
+  </figure>
+  <p>And qualitatively, on our running receipt — same 4B model, LoRA adapter off vs. on:</p>
+  <figure class="fig reveal" id="fig-diff">
+    <div class="fig-title">base vs. SFT · the same model, adapter toggled</div>
+    <div class="pcol">
+      <div class="pbox bad"><div class="ph">base (adapter off) · pair_f1 0.50</div><div class="pbody" id="diff-base"></div></div>
+      <div class="pbox good"><div class="ph">SFT (adapter on) · pair_f1 1.00</div><div class="pbody" id="diff-sft"></div></div>
+    </div>
+    <figcaption>The base already produces JSON with the right <em>keys</em> — it just gets <span class="diffwrong">values</span>
+    wrong (a stray time on the date, a dropped "53" in the address). SFT fixes the values. That's the gap
+    between field_f1 and pair_f1, made concrete.</figcaption>
+  </figure>
+  <details class="deep"><summary>Go deeper: how the numbers are made (evaluation)</summary><div class="dbody">
+    <p>Every prediction and gold JSON is flattened to a multiset of <code>(leaf-key, normalized-value)</code>
+    pairs — list indices dropped, so repeated line-items share a key like <code>menu.nm</code>. From that:
+    <b>field_f1</b> (F1 over leaf keys — did it find the fields), <b>pair_f1</b> (F1 over key+value — the
+    headline), and <b>value_acc</b> (of shared keys, fraction with the right value). Values are normalized
+    (lowercase, strip commas/currency, canonicalize numbers) so <code>1,000.00</code> == <code>1000</code>.
+    Decoding is greedy for eval so the number is deterministic. SROIE (flat) and CORD (nested) are scored by
+    the exact same code and reported separately, then macro-averaged.</p>
+  </div></details>
+</section>
+
+<section class="section" id="recap">
+  <h2>When to reach for which</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Method</th><th>Use it when…</th><th>Cost</th><th>Here</th></tr></thead>
+    <tbody>
+      <tr><td><b>SFT</b></td><td>you have labels — <b>always start here</b></td><td>1 model, teacher-forced</td><td>did ~all the work</td></tr>
+      <tr><td><b>GRPO</b></td><td>a reward has headroom above SFT</td><td>G rollouts/step</td><td>flat (saturated)</td></tr>
+      <tr><td><b>GKD</b></td><td>smaller model + a stronger teacher</td><td>teacher+student in memory</td><td>real +0.024</td></tr>
+      <tr><td><b>SDFT</b></td><td>adapt without a teacher / retain skills</td><td>1 model, gen + 2 forwards</td><td>label-free lift</td></tr>
+    </tbody>
+  </table></div>
+  <div class="take"><div class="ct">three things to remember</div>
+  <b>1.</b> SFT is the workhorse; RL only helps when the reward isn't already saturated.
+  <b>2.</b> A teacher's <em>distribution</em> can beat gold labels when the student has headroom.
+  <b>3.</b> On-policy methods only fix what the model actually samples — a cheap supervised warmup beats many
+  on-policy steps from cold.</div>
+</section>
+
+<section class="section" id="glossary">
+  <h2>Glossary</h2>
+  <dl class="glossary">
+    <dt>Token / embedding</dt><dd>A piece of text (or an image patch) mapped to a vector; the model operates on the vector sequence.</dd>
+    <dt>Attention head</dt><dd>One parallel "lookup" — a set of query/key/value projections. Models run many in parallel.</dd>
+    <dt>KV-cache</dt><dd>Stored keys/values from past tokens so generation adds O(1) work per new token.</dd>
+    <dt>LoRA</dt><dd>Low-Rank Adaptation — train a small <math><mi>BA</mi></math> update beside frozen weights (~1% of params).</dd>
+    <dt>pair_f1</dt><dd>F1 over (key, value) pairs of the extracted JSON — the headline correctness metric.</dd>
+    <dt>On-policy</dt><dd>Training on sequences the current model itself generated (GRPO, GKD, SDFT), vs. teacher-forced gold (SFT).</dd>
+    <dt>JSD / KL</dt><dd>Divergences between two distributions; KL is asymmetric (mode-covering vs mode-seeking), JSD is its symmetric blend.</dd>
+  </dl>
+</section>
+
+<div class="appendix" id="appendix">
+  <div class="partdiv"><div class="eyebrow">Appendix</div><h2>Derivations &amp; engineering notes</h2></div>
+  <details class="deep"><summary>A · RMSNorm, in full</summary><div class="dbody">
+    <math display="block"><mrow><mi>RMSNorm</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><mfrac><mi>x</mi><msqrt><mrow><mfrac><mn>1</mn><mi>d</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>d</mi></munderover><msubsup><mi>x</mi><mi>i</mi><mn>2</mn></msubsup><mo>+</mo><mi>ε</mi></mrow></msqrt></mfrac><mo>⊙</mo><mi>g</mi></mrow></math>
+    <p>No mean-subtraction and no bias (unlike LayerNorm) — just rescale by the root-mean-square, then a
+    learned per-channel gain <math><mi>g</mi></math>. Cheaper, and empirically as good for transformers.</p>
+  </div></details>
+  <details class="deep"><summary>B · Cross-entropy with the <code>-100</code> mask</summary><div class="dbody">
+    <p>PyTorch's cross-entropy skips any target equal to <code>ignore_index=-100</code>. Setting a label to
+    <code>-100</code> therefore removes that position from both the loss and its gradient — which is exactly
+    how "supervise the answer only" and "never train on image/pad tokens" are implemented. Labels are the
+    inputs shifted left by one (next-token prediction), with the last position dropped.</p>
+  </div></details>
+  <details class="deep"><summary>C · The generalized JS divergence (GKD/SDFT)</summary><div class="dbody">
+    <p>With <math><mrow><mi>m</mi><mo>=</mo><mi>β</mi><mi>t</mi><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mi>s</mi></mrow></math>
+    a mixture of teacher and student, the generalized JSD interpolates between the two KL directions.
+    <math><mrow><mi>β</mi><mo>→</mo><mn>0</mn></mrow></math> is forward KL <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math>
+    (mode-seeking for the student), <math><mrow><mi>β</mi><mo>→</mo><mn>1</mn></mrow></math> is reverse
+    <math><mrow><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo></mrow></math> (mode-covering),
+    and <math><mrow><mi>β</mi><mo>=</mo><mn>0.5</mn></mrow></math> the symmetric JSD. For low-entropy
+    structured-JSON outputs the direction barely mattered (0.838–0.847 in the sweep).</p>
+  </div></details>
+  <details class="deep"><summary>D · The engineering reality: vLLM, Blackwell, and rollouts</summary><div class="dbody">
+    <p>GRPO/GKD need fast sampling. The obvious tool is vLLM — but vLLM 0.24 (the only version supporting
+    <code>Qwen3_5</code>) is a CUDA-13 build, and this workstation is a Blackwell GPU on a CUDA-12.8 driver
+    with no forward-compat path, so vLLM won't load. The repo falls back to TRL's <em>transformers-backend</em>
+    rollouts (<code>use_vllm=False</code>); a 4B model plus short receipt JSON keeps that cheap enough. The
+    lesson: on new hardware + new model combos, the "standard" fast path often isn't available yet, and the
+    boring fallback is what ships. (This is also why <code>flash-attn</code> is vendored as a prebuilt wheel
+    — recompiling it on every environment is its own adventure.)</p>
+  </div></details>
+</div>
+
+<footer>
+  <p><strong>Run the real thing.</strong> Part I: <code>python train.py</code> (nanoVLM). Part II:
+  <code>bash scripts/run_all.sh</code>, or the per-method scripts (<code>train/sft.py</code>,
+  <code>grpo.py</code>, <code>distill.py</code>, <code>sdft.py</code>). Both repos ship a companion notebook
+  (<code>workshop_walkthrough.ipynb</code>) that runs every idea here on live data.</p>
+  <p>Interactive companion to the VLM workshop. Figures reimplement the repositories' own code in vanilla
+  JavaScript; the curves and eval numbers are the measured results. Press <span class="kbd">t</span> to
+  toggle theme.</p>
+</footer>
+
+</div></main>
+<script>const DATA={"curves": {"sft": [[1, 0.1996], [4, 0.2041], [8, 0.0887], [12, 0.0865], [16, 0.0762], [20, 0.0415], [24, 0.0403], [28, 0.0474], [31, 0.0409], [35, 0.032], [39, 0.0162], [43, 0.0303], [47, 0.0395], [51, 0.0444], [55, 0.0136], [58, 0.0234], [62, 0.0161], [66, 0.0386], [70, 0.0183], [74, 0.0358], [78, 0.0315], [82, 0.0263], [85, 0.0187], [89, 0.0318], [93, 0.0168], [97, 0.0246], [101, 0.0254], [105, 0.0254], [109, 0.014], [112, 0.018], [116, 0.0137], [120, 0.0107], [124, 0.0327], [128, 0.0224], [132, 0.0078], [136, 0.0068], [139, 0.0229], [143, 0.0175], [147, 0.0098], [151, 0.0144], [155, 0.0171], [159, 0.0174], [163, 0.0121], [166, 0.0205], [170, 0.0168], [174, 0.0055], [178, 0.0209], [182, 0.0143], [186, 0.0084], [190, 0.0089], [193, 0.017], [197, 0.0058], [201, 0.0061], [205, 0.0106], [209, 0.0056], [213, 0.0135], [217, 0.0174], [220, 0.0107], [224, 0.0055], [228, 0.0082], [232, 0.0104], [236, 0.0179], [240, 0.0081], [244, 0.0135], [247, 0.009], [251, 0.0141], [255, 0.0081], [259, 0.0051], [263, 0.0119], [267, 0.0078]], "grpo": [[1, 0.9906], [4, 1.0], [8, 0.9667], [11, 1.0], [15, 0.9741], [18, 0.9792], [22, 0.9625], [26, 0.9534], [29, 0.9625], [33, 0.9594], [36, 1.0], [40, 0.9806], [43, 1.0], [47, 1.0], [51, 0.9702], [54, 0.9638], [58, 0.9906], [61, 0.9984], [65, 0.9688], [68, 0.9708], [72, 0.9906], [76, 0.9579], [79, 0.9469], [83, 0.981], [86, 1.0], [90, 1.0], [93, 0.975], [97, 0.9967], [101, 0.9969], [104, 0.945], [108, 0.975], [111, 1.0], [115, 0.9734], [118, 0.9601], [122, 1.0], [126, 0.99], [129, 1.0], [133, 0.9992], [136, 0.9813], [140, 1.0], [143, 1.0], [147, 0.9917], [151, 1.0], [154, 1.0], [158, 0.975], [161, 1.0], [165, 0.9828], [168, 0.9552], [172, 0.975], [176, 0.9906], [179, 1.0], [183, 1.0], [186, 0.9986], [190, 0.9681], [193, 0.9984], [197, 0.975], [201, 0.9844], [204, 1.0], [208, 1.0], [211, 1.0], [215, 1.0], [218, 1.0], [222, 0.9898], [226, 1.0], [229, 0.9535], [233, 0.975], [236, 1.0], [240, 1.0], [243, 0.9984], [247, 1.0]], "gkd": [[1, 0.0144], [6, 0.0065], [12, 0.0093], [18, 0.0162], [23, 0.0071], [29, 0.0123], [35, 0.0151], [41, 0.0115], [46, 0.002], [52, 0.0053], [58, 0.0071], [63, 0.0062], [69, 0.0163], [75, 0.0081], [81, 0.0114], [86, 0.0114], [92, 0.0038], [98, 0.0082], [103, 0.0128], [109, 0.0071], [115, 0.0081], [121, 0.0082], [126, 0.0109], [132, 0.0198], [138, 0.0095], [143, 0.0104], [149, 0.0036], [155, 0.0061], [161, 0.0037], [166, 0.0033], [172, 0.0058], [178, 0.0082], [183, 0.0015], [189, 0.0142], [195, 0.0045], [201, 0.0071], [206, 0.0188], [212, 0.0005], [218, 0.0067], [223, 0.0043], [229, 0.0048], [235, 0.0119], [241, 0.017], [246, 0.011], [252, 0.0024], [258, 0.0017], [263, 0.0079], [269, 0.0021], [275, 0.012], [281, 0.0045], [286, 0.0065], [292, 0.0129], [298, 0.0115], [303, 0.0118], [309, 0.0027], [315, 0.0061], [321, 0.0016], [326, 0.0075], [332, 0.0029], [338, 0.0009], [343, 0.007], [349, 0.0063], [355, 0.0035], [361, 0.0026], [366, 0.0037], [372, 0.006], [378, 0.0022], [383, 0.0028], [389, 0.0071], [395, 0.006]], "sdft": [[1, 0.0153], [6, 0.0039], [12, 0.0068], [18, 0.0049], [23, 0.0056], [29, 0.0059], [35, 0.0072], [41, 0.0096], [46, 0.005], [52, 0.0086], [58, 0.0032], [63, 0.0066], [69, 0.0051], [75, 0.0045], [81, 0.0055], [86, 0.0043], [92, 0.0036], [98, 0.0042], [103, 0.0119], [109, 0.0068], [115, 0.0015], [121, 0.0104], [126, 0.0031], [132, 0.0059], [138, 0.0026], [143, 0.0036], [149, 0.0057], [155, 0.0025], [161, 0.0058], [166, 0.0061], [172, 0.0031], [178, 0.0032], [183, 0.0032], [189, 0.0023], [195, 0.0041], [201, 0.003], [206, 0.0105], [212, 0.0031], [218, 0.0036], [223, 0.0025], [229, 0.0018], [235, 0.0051], [241, 0.0059], [246, 0.0046], [252, 0.0026], [258, 0.0022], [263, 0.002], [269, 0.002], [275, 0.0032], [281, 0.0032], [286, 0.0018], [292, 0.002], [298, 0.0038], [303, 0.0027], [309, 0.0029], [315, 0.0033], [321, 0.0021], [326, 0.0022], [332, 0.0024], [338, 0.0029], [343, 0.0036], [349, 0.0023], [355, 0.0064], [361, 0.004], [366, 0.005], [372, 0.003], [378, 0.003], [383, 0.0033], [389, 0.0027], [395, 0.0027]], "grpo_reward_std": [[1, 0.0202], [4, 0.0], [8, 0.0333], [11, 0.0], [15, 0.0291], [18, 0.0197], [22, 0.0363], [26, 0.0509], [29, 0.0224], [33, 0.0202], [36, 0.0], [40, 0.0228], [43, 0.0], [47, 0.0], [51, 0.0272], [54, 0.0163], [58, 0.0202], [61, 0.0062], [65, 0.031], [68, 0.027], [72, 0.0202], [76, 0.0197], [79, 0.0125], [83, 0.0218], [86, 0.0], [90, 0.0], [93, 0.0258], [97, 0.0065], [101, 0.0125], [104, 0.036], [108, 0.0258], [111, 0.0], [115, 0.0362], [118, 0.0154], [122, 0.0], [126, 0.0103], [129, 0.0], [133, 0.0033], [136, 0.025], [140, 0.0], [143, 0.0], [147, 0.0086], [151, 0.0], [154, 0.0], [158, 0.0258], [161, 0.0], [165, 0.0176], [168, 0.0449], [172, 0.0258], [176, 0.0202], [179, 0.0], [183, 0.0], [186, 0.0054], [190, 0.0219], [193, 0.0062], [197, 0.0258], [201, 0.0301], [204, 0.0], [208, 0.0], [211, 0.0], [215, 0.0], [218, 0.0], [222, 0.02], [226, 0.0], [229, 0.0421], [233, 0.0258], [236, 0.0], [240, 0.0], [243, 0.0062], [247, 0.0]], "grpo_zero_std_frac": [[1, 0.5], [4, 1.0], [8, 0.0], [11, 1.0], [15, 0.0], [18, 0.0], [22, 0.0], [26, 0.0], [29, 0.5], [33, 0.5], [36, 1.0], [40, 0.5], [43, 1.0], [47, 1.0], [51, 0.0], [54, 0.0], [58, 0.5], [61, 0.5], [65, 0.0], [68, 0.0], [72, 0.5], [76, 0.5], [79, 0.5], [83, 0.5], [86, 1.0], [90, 1.0], [93, 1.0], [97, 0.0], [101, 0.5], [104, 0.0], [108, 1.0], [111, 1.0], [115, 0.5], [118, 0.5], [122, 1.0], [126, 1.0], [129, 1.0], [133, 0.5], [136, 0.5], [140, 1.0], [143, 1.0], [147, 1.0], [151, 1.0], [154, 1.0], [158, 1.0], [161, 1.0], [165, 0.0], [168, 0.5], [172, 1.0], [176, 0.5], [179, 1.0], [183, 1.0], [186, 0.5], [190, 0.5], [193, 0.5], [197, 1.0], [201, 0.5], [204, 1.0], [208, 1.0], [211, 1.0], [215, 1.0], [218, 1.0], [222, 0.0], [226, 1.0], [229, 0.0], [233, 1.0], [236, 1.0], [240, 1.0], [243, 0.5], [247, 1.0]], "sft_lr": [[1, 0.0], [4, 0.0001], [8, 0.0002], [12, 0.0002], [16, 0.0002], [20, 0.0002], [24, 0.0002], [28, 0.0002], [31, 0.0002], [35, 0.0002], [39, 0.0002], [43, 0.0002], [47, 0.0002], [51, 0.0002], [55, 0.0002], [58, 0.0002], [62, 0.0002], [66, 0.0002], [70, 0.0002], [74, 0.0002], [78, 0.0001], [82, 0.0001], [85, 0.0001], [89, 0.0001], [93, 0.0001], [97, 0.0001], [101, 0.0001], [105, 0.0001], [109, 0.0001], [112, 0.0001], [116, 0.0001], [120, 0.0001], [124, 0.0001], [128, 0.0001], [132, 0.0001], [136, 0.0001], [139, 0.0001], [143, 0.0001], [147, 0.0001], [151, 0.0001], [155, 0.0001], [159, 0.0001], [163, 0.0001], [166, 0.0001], [170, 0.0001], [174, 0.0001], [178, 0.0001], [182, 0.0001], [186, 0.0001], [190, 0.0001], [193, 0.0001], [197, 0.0001], [201, 0.0001], [205, 0.0001], [209, 0.0], [213, 0.0], [217, 0.0], [220, 0.0], [224, 0.0], [228, 0.0], [232, 0.0], [236, 0.0], [240, 0.0], [244, 0.0], [247, 0.0], [251, 0.0], [255, 0.0], [259, 0.0], [263, 0.0], [267, 0.0]]}, "receipt": "data:image/jpeg;base64,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", "cat": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAcFBQYFBAcGBgYIBwcICxILCwoKCxYPEA0SGhYbGhkWGRgcICgiHB4mHhgZIzAkJiorLS4tGyIyNTEsNSgsLSz/2wBDAQcICAsJCxULCxUsHRkdLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCz/wAARCAF/ASADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDwS6yxOahgtyzA4rWksi7dKu2dhjHFZWsVuVLW1GBWtGnlKNtXYbFQuSoqz9mjwPlFNXBlCFJZz0OKsLbuDgKa0YogqAKAKsKgUZNaqJNzKMciADoKa5IHLVZuny3FZ8sqp3yaNhAfUCojMEPqahe6LcdqrSTopznJouBf+0M3Q4FTpcIi8nJrGFzuPXAqT7Uqjrk0gLk8pkJxxVTYu71NKJTIPQUqsFNIY5bYnkCmSWgx0yatRygDrTmuIyMHrT5UFzIkt2HbAqAgqeATWw+1h04qnNtA7VlKimawrSiV47p4+tW49R4wTWfJhearNLiuR0LO6N3UjNanQJeqe9aFpqJUja1clFOCeTV2KbBG04NVzW0Zi6EXqj0XTtXKLzWtHq8bjDHH1rzq11F4lG41bGrZHWjlUjlnQaZ1t9cROCQRXM31yAjYqlLqUnZqoyXLOeTnNXGFghBki5lYgVNHZNnNLp6Bn571uRWwYUqtRRWp30qTlsZYgKAZFSmMbM4rSkt9sfI4qmVwCMVzRrxbsXVwUtzOcFGOKjLirUyEc4qlIhJ9K7YNNXRwOLi7MgkXe3Sm+VzipR8vWlT5iTTlsXHTUWJABU4TB4poXjrTlcqORmuGTOStK5EFXuKu2yqvIYVnwOZa0reLI6V6m50F1GJHQUhY56UxYitPCYOTRoMmSQDqcU55gRjmmpGpxipHUBcAVVxGbcSAA/KaxrmTGa17s9RWJc4LGobKSKMs7djioTcfiakmiB6HmqpjYGlcLEolJ60qvucYzUYiY96kjjZWBp3CxbXfjrTmdwOKcq5WgqaY7FU3bKSGOPamG+P8NSXFruOcc1Ue1fHBoJsSHUSBy1MOobu1UJLaUOcCgW0h9aLklqS6DDqKqPPk8UjQMvrUTKwOOaW49R/nkHirltctkZNZ6xsT0NadhbFpBkcVEoJlxm0bVrG0ygngVd+xELxS2sYCACr6jjBrJwSJlUcjHeLb1pqqM1bu02sarw4J5qoqxaehetUbjFbto7hQGUmsuyGcE1vQECPpXFiqTktDtw+JjTdpBIdy4xVGWEg5FaeVZcmq8gHavBlCpB3PoqdelVVjLeLd1FVZbfJ6VsNEr59agkg2jkV6FDFuOjOLEYJS1iYckeOMVGo2itG5hIUkCsuXch5r11U51c8KrT5NCZXGfWlkl2x8Co44ww3E4ptwuFwCaxaVzy52bL9lpxXArZhs9qZ20222g1q248xQMcV3zlZaHakUPIGOQahlXHQGuga2Ux8Cs6eHbnisVJsuxmK5V+BT3LsCelKQN9PPK1q3ZCsYt4r85NZUyEA10lzBuXpWHeRFScVkpajsZTglsCpYtOeTnmrlnZtLMBiur0zRDJztrTci5x50uVFyAagaMocEYNely6HtizsrkdY07ynYqPeizKTRiI+0YPSnblboaWKMysEVSzE4AAyTXX2nw+jgiifXtTGnyykbbOJBJOB1+bnCHHY80nLlKSORI4ySKjKq/AruY9I8Kw3KCO0uLvY4ybm72lvfaoAx/LvWlceAdF1xGbw472GpDJSzmfKSnaDt55UnnHJGfzpKqrjcHY80FmDjinGyAHAqxuMblJEZHUlWVhgqRwQR65p6yxnjNXcy5TOks+DkVUksuelbblW6VF5W49KAsZC2ftVy3h2HIq0YgO1KCo6UMdi1BKFHpVgzrtznms7OelSqOOazlNIuNJyG3DmRjRCm1qft6VYiiBFHOmhyg0rI1NOhGBmtcFUWsqyyOAalupJEHBrCU0cdWMkW5HG3Iqm9zg4zVJ7pyME1UaY7jk1hKmp7kUcROm9DWW5GetSNcKcVz5umU9aab8j+KuaWDs9D6Shj+aNpGvduu04rHlIY4qGTVARhjUa3Csc5zXbRi4rU8/F1FLYtxAlcUskLsc9qjtpsPgjitNQrrwcVE3qeHN6luxDSPg10lnFtUVjaegBzxW7b/MQO1d8z1IlrbhKy73jNbRTisfUEPNYR3LMGV8SGp4TuAqpOpEhq7aJlRWsnoIc8WVrFv4cE8V0/k/u+lYuoxgZrKIMg0qIbl45r0nw1YrNESQOK4HSk+cV6j4RT9ycjrXTAxY+/08CE4WuA8QWI2Ocdq9ZvowYjxXAa3ZvdXH2eIAyOdqg9ya6LK1zO+pyvhOEaFpF14kdFadZTb2jE/wCqOPnkx7AgD0zWW15Nq10xmlEjBt2/nc2fX1/Gtnxw6aPdwaDb/PHp9vhyQCHdjlz6ZBOPwriIrx7cMqZzuBGDzivOnqehSVjrfJSBV8qPZgc55rRsdXuLLVbeRcMqHap5GM549uuKw9N1COe3MTFi/Ubjx+NbcFzAbfeI2Eg4ZmuAFH/AgDislF3OiduXQg+KVko1S08Q2wUW2rx/OFH3ZkA3D8VKn65rhBJmvW7iy/4SH4falpcZ8y6hjF9a7yC7NEPnAI6/ISOOuK8cYMjAkdea3i9Dhk7MvwkGrfl5XiqFqfm9q0kPFXcSaKz4XINVy43cVauRlfesyUMrA9qTdi1Yuxtz1qyhyKzEk5HNXYpOK45tyeh2U3FIsZwRU0ctQKQTSOdp4rWKaRMmmzXgnA706a6LDGc1ii5Kjmj7UD3rhqc3NodHsoTiXHcMfeqkgO7ik87cetJuNb0G+p59XCxjqhrD5TmqE5KZxWg/3ap3CZFeikc6VjJlds9amgc4HNRzL81S2yZYUmkTPU1bU5xmteF+1ZNuNoFWkm2tg8VxVFqcFRHSWgZeOlbtlzisiAL1zW5YhRg16Eo3PSTNERlgKzdRhIBrWSdAMVnajMpz0rHksXc5SdMOau2C5AqKfazmrenoQQKcgNAxfuulYGpJ1rqdh8n8K5/U05NZxBlfTFxIBXqPhIZhrzSwjzIpFeneEVxBXTAxZsah8qVyuoXUOjyxXkhQTPKsUIYfeY9x9Bnn6V1eoLuGBwTxXL6kkFrejXLkiQadmCOJuVywBYkfT5adado27jhG8rnmXilLq61W9nlh2xzyNsbpklupz3xiuGkuFjuCPLLMfRiDXV+KdYivHjurdzHDNMXCBsBFx93B6Edj9a4OZ/td7LKC20HJwNxUevrisIRudTnY39J1iUXKo0OwE4IZs/oa7XT4rq5YT2cVvD2NwU+Yj0G0ZrD8NSWLWQkvLY3AXCs0GDIB2JB5x+B9RXQXGpaF5aRxQzyyZxifcrA44wAQPxHWnJJExk9jU8NyPYeJY7mNc/Z5BI0cZViOMEheMgruGAPwrJ8SeDobHxZd6emEhEhkhYjgxNyp/AHH4VmNrJtNchmtogu8rG6M7FuuVznt7113xEv3m0fQdZiKmeVJrR2OBuUEFeB3wxpQfva7ETV0cafDktuhkVd0fTI7c8U86a8cfK5x7dqt+HtXOx4JZVyx4DA/NjtW619ZyQjcoXK8CupwjujnSfU4i5tmjGSODWVdL8hGK72902Ka1JTnA6iuPvrOSIklTjNZVINIpMyYUJYVoxxk0yCEFwMVuW9kAg45rjtqHtHczlQgmmuM1pyWm0niqkkJDYrojqrGimyhLwh4qqFcnI6VoyQlkPFRJHgYxWMqabK9u0ioCynkmp0c7eas/ZN/QU42YVOaUYpMxliW9GVw2ajn+7UjxlD7VFN92upPQpO5mSrl6ntIWdvakKZetG0iwBSZEiRUKrTQGParW0AZqu8gBwK46iOKZvLdlGAre0+63IOa5m8jaNjkdKv6TOWwM16CloehbU66IZXOaq3sW4GtCxtzJCDTrqz2g5HFYuepqonHyxskprS04ZIqK+iCSnFS6Z/rcUN3Ejf2Zt65vU0O88V1aJm3x7VzmqxkPUIGVdNHzCvSvC3y2xNec6evzivRNBkENjnNdETE1r0q4IJwMc15JrniVptJlsDtLrNJvYnIfngkdiK7LxFrjRwOsJ+ZgVyK8Uv2l+2tywGDk+pOeazqvml6G0FZXMbVWNxGX3DYi4wtReHNP83WoXl3GFXALr2JGVP6Veaykkv2Xyv3bnJJ+6f8K6W00NLVGeL925XnYf4gQefbr+dDfKrIaV3chsIYpJkjeEpJHGf30agBgzHhh0IGRzxjvXR+HPCp1O+kikilkidiFJGDA4OcEE5HIz+fep9I1iwtfLkJjWcs68r/AKxSvI9unfjIq9L47KpcfZLcR3kURCO3U4IO3nqMZIz0zUKTfQbVtjA8T+Hp9C8QRCOHdHPtCg44Azxj14xipfG9zB/Y3hvTIG3xQhy7E5JLY+9/tYIz7muj1XVpPEul29xNbFpJZo1ZYx80eBl2Hf0H51gTXenmS3tXtUUyNMUfjIKDaox6kqPyqkQznzYEa5YQW8pSSWNy2R0Kgkfzx+FJ9reCeRXLYBAPmYyCcZ/Wkm1BNT8U6daPKDCoUK0XUBypI6enH41Hra3N74o1HcqNI9y/Mf3Mg8hT6DB/Ktou2jI6nR2uoBF2rJ8sijr646Ux44r/APdrtZQwywHAzxXOWs+57VXJWPfz64//AFVeuJvs9veieQwyhV8s4xuPHy47HGDVp9GEl1LU+gi1kWRMmNjxx2rRiiVUAABNZtvqkq2xSVvNyAS+ckADgVhXOr3EEzGOUls8AdK5+SNxOHU6qaI7vmXFZt1Fh+KzrHWNYnfb9nlndjwqJmumtvCPi7V40li0n7Mrj71zKqY+o60Nxj1KUG9jA24BGKrgASV2tn8KPEN1Oy3Ouabb8ZKxI8pH6AfrW1p/wZsBIBf65qFw/XEMaQqfoTkmsnUi9mJ0ZM89gjyDgUSx4Fek658I7LS9Au9SsNXvE+yRmQpcYYOPTIA5rzSRs87s1KWpwzpuEtSnKuCRWfN0xWjOetZr8tXStjrp7ESLlq0IMBRmqaDDVYQHFQyZMmkfA4NZdzc7HAB5q1OzKh5rCmdjKT71m1c5Xuen6zamNjxxWdpknlz4Nd94g0BtjHBrgZ7Z7S75Bxmt1FpanoOSueg6PcBo1Ga0rwBoc+1czoEpcKBXYfY3mtuKxcXc1UkcNqoxJUemt++FaetafImTjpWVYKy3ABHeqSZNzroeYfwrB1RfnrorWB3gGBWPqtrKHOVNNITZm2a/PXV290IrTHTiuXt1MWSRUtzfslsw9uKtEGX4g1EsXKZPPryD7+orjhHdXrvGU3N1OCAcf4Ve11FuHjcSPCzc53f5yDUen3jLJ5TrCzouUYHG8Dpg+v1/xrOW90ax2szRtNJeMJNLAVRRg7h1PNQXd04laKKMgxlip65HGefb+Rrd0y8uNRspW8yMxckoTgqfp9aryafBNN50cijDAtGzgcYBBGeCOo/OpjfqOXkckHxOsYB2/MkZK8B8Dk+ueT+NbNhNDJe4uAY/lAj5w6Erja3tnj2qMWCTQsrusU0ZKqp/iI+7j2xgZ96Y0S2+omWXf9oLBoyx++B1P8q0ZCL1pqUqaq7ArHsYeYBkF235IA9t3T6UK8kdk9xd2vkIVZmmkx5hDMdwz25PHsKWG2gtmhvJ3L3EUihyRkSbuVf8hj6iofGIup9Kit2eBDs/esRliqg5wfQBV9OTTQnscroV39o8WJPlAAS+TwAoB/oK6SGdZdTnvRahbSKCeNhv3DecLx7klR9SazPDeiSQhplVZBLCZGYn/VruUjd6YAye3zAV0AhsrCSTT4BvSQuFxy28AEsSfu856duRTbQkjl7AxHULZWZkyxDA5Yp1Hb6dq349OuZ7W8gmy7ShJEc9W8zhTntnI+gzWFp8by6hHPImIreKIs20gtkjH44Irf1HV7u08L3RaKKE3zBFUNuZFU7Sc9Mc4GPelfUroRGMTaVeyLJFbxJdlI+OSiqcc/hn3Nd74M8DaRZ6bb6nrEQur2UCSO2dwigE8bvfHOK4fwxcMbWezuIt8PDq2zKg+/qeenqa7O6uL2OFppLTzLveFUBSSgx3xwOO1ZVG1oi4q52T3saNJFYQ2sUXTZb4BY/Xr+NMDweYGlVo1f5sKzBsg9R2P5ZrO0O7V1Uz2q205BOCCjMPXHcfStG/mhltXXy0mRx9yNwGz/eHv+X41zwjfc3ehKviDTZU8ppNzJwrE4P+NWbG/l1a7NtBdRmGMZaX+4B656Vw2neH5tc1dYEklAX5vMlTBUdwx9RVHxr4tgtLOXw3oO77MPlubg8NKw6j6VokZVJqCLPxG8ejUHXRtJmP2KFg0ko4aVxx+VedtITzmoAjYoLleDWqOG3M7sJG9ah2ZOakbnmnKM1r0NtkQquGPFWoYspTUTL1qWdo8q4VaxkzlmYd5GQDWQLGSaTOCBXoI8Pl13OhNNOjJED8mKS3ISue8arpiyRMNteUeJtLEMzHb3r3a8gDRmvNPGViNjMBXrcqaL5rM5PwuP3wX3r1PT7YNbjI7V5T4blCahsPY17Ho+Gt1+lRGmrXNHPU57XtMVoWO2uOhsNt2OO9eo6tCGt247VxcUIN5j3odNMnnsb2m2P+jrx2qDUtKEh+7XQ6ZAPIH0p17AFBPtVciE5HmWq2y2wIxjFc1eyBosBuCcA9MV1vieeSFm2uR+tclLcCUYaGNv73yf4VjOHKzSEro5DxK7iSNW2khc4b5S9Y6QOI1d5F8gNkIW+ZT9O4PtXYajpsWoskW4JgE7ScjPpg8j8642/09rW/Nut1EA38DthSPr2Nc0ZJux0Si0rnceFYZph59tdLNHINvknIY8YOM+o/UCtnUbGPT4DNIuIwVkaPGQT3we3avK3e/wBEdJ43ZY25V0fI/Sr/APwmN3fQpbX87yw9OW5H4+lNxvqiebozv006z1GAXtuqtEjearM3zAjnafXp265NYet3C6DGkbRCTeoJBXI5yDtPVT9K6jwVZ22o2L20bui7MBg25WHYnHr07Yq5rXgxIoPOgC3VqjBpCXLEcHgg85HB98e9Zp3ZbRxtjamWMzWg8+K7hk3FuiBSGVSezDjp13UzxFcRx2VyTbxLNMWXLDJIL7sAf7oP510Wn6HD4d8JX8yMHSL94JWbjsSvr7f8CHavPdHd9f1FYpGkKqSz7OSey/rVeZPkWPB149vfTQ36bxcAoYg2C5DBsMPQlee3HNbUwH266unEIdlabdEcglmG5gDxnHyDPauavbRYPG0VvIx3cCRAOVTaAFP+0R1Hv7mr+q3NvJfP5kbxeQUjkhwS+c8AHPuMjH605dwQhvpbXQTbi2Vnu5n3+a2WAJVQM/h/U9hTPGEV5BaWNu7MttGAQjgKd/KnA6nAx7c/WryPZ4kvZVSGO1KW8Ue4Els72JODk/n3qLxPfw6jrX2CK2EsisBPMCZGJB5Xcc4x0wOM898Uhl/wxp9zKkC5XYSJFLvkAg/McDgDpya918L2lvZxywS+SWJ3CRQoO48duv1rzPStEvEs3KyQ2zNIkbR9fLjxk5YcLnjgnJxXdJqsOnxpdzHzlSPgv8ox0+Vep6dawlK7NEin4wt7C1vg0MzXFyvzFSTuz6+uPpVbRba61/fCUWOVBwysCR7Hj9K4nWvE+t61q++0jWO3ZuPNXyUx24OPzNeseCYptH8Oz6pqaW4lC4QqV+f0Gf8A69Nq7SGpWRk+KdTXwzpZ0nTkja4uUxPMj4ceoFeVz6STIZCGO7nkV2ktrcaprU15cQBGlcsdo4Fas+iJJajCcitXHSyOGo23c8tkswvGKz7uDZ2rstU00wOTt71zmoxdAOtKKFAxsfLUsKlmxV2GyUryM1PFZrvyBir6G/Qfa2CGQZ5Jrr9K0+NFGFBrBtU2yjNdVp8iqoqbGTjqX2tVMfC4rJvrYKDxW3567Dk1i6neRjILCqsFkj3GbmM1wvi+HdavxXdv9w1x3ipR9lk+lelEwZ43aXBtdcxnq1e0eGrvzbRDntXg2pzeTrCtno1eueC7zzLRRntU03uipLZnYagd0DfSuKQ7dQP1rr7qTMJ57VxjNjUG+tWSzvdLfMA+lGpybYSfaoNKf/R157UzWJQLZjntTsJ7HmPii7DXRB6CuUtpZpbpjDGJQOq5xxWh4rutl0xJ4rN8PvG12rhHY55wf8a568tzeiip4muZrF4JogAVGQp6/TNVdNi0nxNHIk9nKJiMhsghG78jnH4V1/iPSheWBfyd+3nk4YVwFvYtBcOlnfmCYncuQQGI6dOv4V5kZrVdTvlF6MzdU0240aR7OaJhEW4bG4fpXafDrw9oWsyldQgEjpgbQ+0Mfy/zg1Bq8eo6lo7T3EUbNCP3gjxg/wC0MfyNYGgazd6TqSSRFnAOHBJ5Ufy7VopXiZuNmdn8R7Y6B4xsYNCmGmOtuFV7fKhl98dahtfiTPZ3Hk6oxvAw2m4X74/3l6Efj2+hpfHd4dQvNP11SJIpIRE4A+6Vzkfkc/hXK21nBNdfb2nTylBCnPHPXjvVqV0iGrM9E8W3FtqHwwvLvS5/MS4iDFUIIyG5H5dvYVn/AA+0O30/QRdOuJ5hvJxzjsPUAj+tcf4IvN/xAj0+1c/YLmT97F/A4Az09c13/iNL3w9cmO0ChJuFGcbAQelc9WTi+Q2pxUlzHmeo2t83iae+g2xpbfvElbgA43Bzn1xn8vpVKOAy6idQluRJGZFkZzwRyM59OcV0F/ZTTxXDyx7ppZSWcE7JX29B7cAD6Gs620N9TuI7aGNLSS5YQsG4CgY5/Ek8+xrdTTMnFo29B0n+3r681WNTHo1ipePCHapGMuQf4jtPWun8NaTBcCbWI7eM7eUiZtvU/wAbdvXCjPuK1fFelJ4N+GdroOnIZr/VZFtv3WQxOMlv6Vs23hdvDvhK0snjzMwHmyb/ACwvGcAg1m3zK5SVtCO/trcywwsU8osSVjcxxR56gYGSSBjsepJ5qrq5mtNNaG2hMZRcI8PBUep7/nV/RDFHLi600WSb/kMmTkjvknqfetbWLSzuLAxrFFJKjeYyAlWGe+4Gs+V6Fpo858JeH7rULxrqe1jcK/zyEff/ADrutYuJri2htW2xwQcJGgwKdp80NuW2GWNcYwx3An9KoatfL1yM10xhbXqYOTeg3T1EE+QcE+ldFHKrR84NcXBqC+YMmtqHUIxH1q7ENGX4j8tdxwK8/u5VkucDpXVeJ75HyAa44Rq0m4GpcRRRqQRKVoCbZKdbFSoGcGnTbUXduzRYob5oWTg81owagIo8k1gBy8pNWU+ZcZoaBmtNr4SIgGsS41FpySD1qnfpIqkqaoxPIVwRzU6mLZ9bSSgIea4nxbdBbV+a37m9CxnJrzjxhqg8txur0ea2pna55Xrt1nUjg/xV6b4Fv/3CDPavGtTuDJqJOe9d54M1Axoqk9KypztI2lG6PYLi7BgPNcrJcD7aTnvUr6huhxntWC12BeHc+BnsKuc7MlQPS9KuP9FXntUWsT/6K3Pas3SLtDbqBk/U1NqM7NAdgwf9kZNU59SeQ8t8SWkt1K2yKWQ54EaE1F4b0u9trgNJZuoHP+qZz+dX/EC3UzlDN5Sns8nJ/Dr+lUtN01rEGWW+EII6FSv/AKFiuSb5jogrHVXc++Ag2xhyMZaIj+dcHJYxNeOkqoyluCoAx+NdTp15EwZR4jXIPTeeP/HsVNqNtLcxrLHqWmXe3qsxXJ/EjP61584a6HbCempzsnh+7a3ElvNJvA+R93DD+63TI+tcLqds1pqb+baPZXCHLwsMo/uD2r3Tw/phkgObV7bI6wzebH+RzVHxPpdkLcyXkUcqgbS6Y+U+6nn8KzhOVN2lsVKEai0POtJ1pX0qWyu7Z5bGTlgv3om7MpqK88DNf2M+oaZew3dtHkt1ikA/2h0zXW6ZbWcd2jxxpLDIP4eBkegP16Vl+KtTg0uzmgtV/wBev3wm0j8OePb9K6acm3aBjKKS94zfhFoSXPxFtGjkJEMRlOeucYx+tejeP915rZRMG2thtYgZye4GOuK8u+HN3qNj4hN3b3Bt1KFCx7jNerSwC8t8qGZwQ7P3bv169e9Z4iaU9SqMW43RzH9iLdR7xCAzHGFZQB1GMfQ1v6N4MttL0+XXdVP2WytB5hmkO5zgfw49+g7nFbGhaQDPK0xVXYCILk45OBwfTJ5rhfi541S58RWGi2Bb+wNLYBzGflklHGfcL2981FKLq6dB1Jez9R8PjXRr7xSuqXlnq5a2G233BGKj/dzwfoDXoXhjxT4V8Qah5xkeKZAo8u6DIw5446GvGnm0qTUFvBfQCMDON3JPsOv4V3/w88NReKtVvNV1C3eHS7a3NvEGyhJPO4+/fHbiuuMIpHO5Ns6vxFq2jLrEdzbXEaLCuGUN8pyevHGaoLcJqskwtXcqeVlVhhh6Y715zP4KebxHNb2d95kaSY5bORnkg969e8PeGoNPsIoljkOFAPmYP/6qtRQnJmLLYG1t8by34Vyuq3DxsQ2a9WvNMDRY21xHiHRT5bELVMg4hL1hJnNXF1N1TG41QmtWhkIIojTeeaEzS10UtYunlYNk4qjbs7NgVvS6YtxERjmn2ehbWHymhuxGxShgmK5AqO6juApytdpZaPwAVzUl9og8rO2lcR5/CWGcjBqwjtu4q1f2XkOcCo7cKcetMp6orXWSpyDWarbXrpJrTz48KMmsW606aJuENBlZHuOoXEnlkA15v4m8ybcDXql3Yl1Nclq+iGQn5aidRo0jC54rPpbvOWwetdHoEEkDdxXSN4dO4/JV7T9CKNytZqtZmrplVZpdmMmoEedbnIZxXUJonHSnroZEgYLVOsL2ZY0jzTCpIA9yBWncI0kJUsxz6fKKt2GnBIxkVfNjuXGKvnuiOU801WywzBFbnqEOzP1PU1lSWot4D5NmpmbgBYt7frk16hcaRCGLsm8jtnArivGk19FZNBZMYAeohO0/if8AGsnItRMywsNVFsRPdLYY+bEu1W/75Az+eK1bZoLmExXOpQSdj5gjbP4EVxOhW9pCxe4fzpD15IX/AOKb68D3ro7WSKzuMrGlurcgnbEP5M5rOb1NYK+psabawaVqAktJ7Qq558qIRn/xxwD+Va+vwTSwCVkidGGRI5DBT64P8uay7e9aU8M0iY6/Pt/Nm6f8Brb0m7guh9na4geUHKBVEjD8cACs3aSsWrxZ5frWhR3d3KdPb+y9Ug+d4d+2C9JH8DdM8YxVHU7Sy1DS02LIt2gHnQ7/ALj/AN1gfz+lepXvha3u5mjlt5JICfMEaj7j5+8pOAD7CrWq+Eln8E6jb7VuLkxf65QBJKQO+B97ihSlokDS6nh/gu0muNeADkDdtVARxzjPsK970axWK0CtluADkZyQK+e/D2troepSWt1GrlW2mTGTjI5/IV7ZpOvW8lrG0UwlVlBAjcEZx06/hUYmPvXZVGXu2RQ8cay2i+H9QS1nEU1wojiC9VOckj/Peuas9P0q38HWi6hpJvp7r948iybHAPp71a8U2w1DVZNQvZ/Ks0AWAMOZOfm+XvkjH4VtW99Zy+G0SCCa3L4O1o2jKY5HODkfWnBcsFYU9ZM41f8AhGNCLF4tSIPJiAjUj2LgbsV1Om+OLzVLSLSNDs4dLs9uwccDPXn3rlL7QxeXRuDErtnDIpIVz6gdq67QUi+yJHFbeTNHn5lOMj6GutNy63Od6G/pHhGLTrlZC7SyS/M7h+n4V6FaRKsCruLADvXBxXpt7tNjed6tXXWV40iLnPNbuLSMb3L08alSK5vWLNZI2GK6NjkVn3yAoeKybHY8j12xELsQOlYdoAZse9dx4jtiQ+Frh4UaO6IKkc04s0Oo02xWTbxXS22hxkAhayNCIfbwa7myiBjFNktFK30hVA+UUy/0wGEgLXQLHtqK4Tcp4qRWPJdf0xo9xCVy8Ns/mnCnrXruqaZ54Py1z6aD5c/Kd/SjmGkYenaa7gEqav3OgeYmQvNdVaaaqqPlFaUenAr0qbkOJtyWwI6VmXVkrZ4rfI4qnOgJNElc1i7HNHTIy/3asW+lxg521pGEbqsRQ8cVioamnMUV05AOBSrYru6Vp+VgUCPmr5RcxHDbhRjFT+SMVIq4FLVpGbZRmgGCa838cGaJSqKFR/bJNepyrmM1x3iDTHvjgMMemMmonoi4PU8FOqy6bfNFEpaRm5fqc+3+P5VsR61bQx+bOwmuD6nIB/rWt4k8BXcSy3NuPmYcjGTXmt7puqWMubmCRcdBjrUe7Na7mnvQZ6Bb6q11ADczfu2OQvYn6d60bDUJrKcSWjBMnjnn/wCtXkq6ndJIGdm3dB6L9K6DT9XukiLFgXOFQH69TWbpNaplqonoz6I0TVrfXrcAt5Nyg+YA8n6VYvYdXtkaS3i8/H3QGw2P5E189ReMpLU+dHK0coYgEHsO/wCJr0DQfi5dWpUXrC4jAA+bqOKpXXxE3XQz9W+H+o+KvFct9Jpy6VKyje+Nwc+uBjBrsvCvwW0Wxxcatdz3snUxKTEn0IHJrP1H4qX72bfZ0hV2AcMByBWHd/ELUPJLi/cAgBlVvu571anbYmSv5Hp+ttZWdxFJstY2O2GCOO3VpOAcKpboeuB1POK4PxB4rngvFa6gjmt5MrDcJK0eeeiyLgqw7qwIzXPz64L9kjhRJY7lNrxOSN44YpnqCM7kbqpGPatvQdPubmeeDVUF2kybvMk+5qEXYsP4Z16bh1xg54J0UVuzLmeyNDTZU1Yb48XDKu2W3u41iuM4yGRx8rjH8q1tC0d7RpZlUvCc/I4wy+x9D+hrPhtY7S7gsYIpGsHTdDLjOwg9j2I7jvXZWk6/ZjAQryBMnb/EPUf4VtBENnns2oR22ss0e5BuwVJ6V3Ol3nn26sD2rhNYsxDqrhxlXO6Nh/EP8e1dZo6lLBD7VsyEdZbyBlwTzRPDvBrPtphIQVJFa8J3rjrXLONjRM5y/wBJEwI25rmrjwuPN3BBmvS2tw3UVA9gp7VnYtM5DSdI8gj5a6i2gCgcdKkWyCngVZjiwKpCY3YMdKa0QI6VY2UuzimSZ0lmr9qrSaWp/hra2UhQGiw7mMllsPAqykOBVpo8HpQI6mwXHnpUEmDUzZNQMOapsEiIRnd0qzHFgURp7VZQbRSQ2yIp7U0LzVgjNIABVEkRU46UgTNT7d1Ajy1MCPysiuT8YXbaZZNNC4R174rthHxXNeKdDXU7ORGJ6GomtNCoPXU8kuPiRfSyrBHJEQOGJSrTNFq0HmXjoSw4KriuOu/JtdXls44PmjcgtiunsVt2twspZRjmuKpsdkPI5HV/Dbi+LworxjgEDp71g31o0CTGBiDwqj0xXq80RhtGVYWlBGAR1xXI6tpTTwhkQqBnI6nJ/wDrVNOo72Y5wR549hM8G4cgjA5pzfbIphlH6gdK7G18PyebHsDbig+QjpzXc2Xhi2kijeWBSxHPHetpYjl8zKNC55YZr6VxgMqjamQO3Q1ZsdBvp7po2JKLwST1FepX/hxPsQFvAokLdx19amtvBl1JNH5jBF4YMP5Gkq6aG6VjntL0VNNhtorhxIwBaNu6sDkf5966+K0n1e0H2SSS1QETrIgwYn/iH0PX8Kh1rQobe0IjZvPhIdQejeoqxYa+kUMMKI0aumGA5KnBzWsXdmUlY6+yuILOCK3uIU3yjeHUfKX6Ej0z/WqWppDpGlPdEEKWJjI/hJ6iqUM4ntTG8+7eSY8DgHA/wrK1aW7mtXtjc43Mdqv0NdsNEc7My533cC5laRRIdpJ+6TyM/Wur8OXfnWfkuwVlGD7Vwk13Ots5i2qVb5x2OBVrwzq0k+ortIDsdr56H3rWTuSj0GKaKEsGl+bPXNaum3Kq4zJnPvWPJbrI20qCcdquWMSRY3jlazauhnVx4dc9aVo81BYyiVMr0q5WVh3K+w+lNK+1WSBUZUUrBch707igrzSgUKIXG4p23FKaXrTE2RlQaQJjtUoFPCigRn05Yh1IpmcGp4zxU2RoAUDoKcBmlPSkBFNoBSOKZ3qQ4xSBMnNIBwXjgGlAI5p2DjikIPrVCuG4mqepIZLR1BxkdavKuBUM670INRK9hpnz/wCKdOt9Ju5bnnzGYn61n6Ne3F048y33IT616D450KK7UBhkZrA07T4LMKoIQD17151R20Z6FPXVGnZpAkYXBb27CljsrYXX7iFct+VWMxyQssQ+bHWjTZDChR0w54WuJs6fMr3WnFCXgjUP0JA5qK6vk0qygW5DFweWXoD/APXrT03zp7qf5DsVsAnufWrWo6VE1tiRVIHPPOTVxk1uiJWMaC9ubjSFktyJZPMD7G67T1FWIfEqQ3JtZ45ImKEjd0JHbNYN1BcWMjXFpPsOeR2PtitMahpev2UdvfRiC5BIGOpI6kV1U5J62MJxsLL4lU3Ku6ieE/JIR1U9j/So2nspL+OaJl2qCZImHI9CDXP6l4Tv7ef/AEGUyiVT0P3h2P1qjF4c8RBy4RyyrhXbqR6H1rui4HI+Y9Ht5rWFgUOFcgq7cgH3qtr1s8zeekO9EG4KvrXJadDrFhayW16xRCcquf8AGtq01u7NpIr5LqvBcc11RRizj9UvSbaQszQ7icqRg1V8M38lrqiKWDAngir3im7sNV0/ereRdLw6noa5LQJJI9TRGfIzgGtHsStz6G0++WdFLDDY61qxRSSLxj8K5TRBi1HmFiMdfSuk8PvK0jKJPMjzxk9Km4zZ04vA21q20YMorClmEFyitjmtiN1KjHeoYiQgUhAoxSqvakBEy+lIBU5jpoXBpWAaEzSlMU8ClK5osBFilwaXbzS0WApNGppojwetTFVU4JqREUjORU2KuRqhPagpt7VbUDHFNkUVVhXK6jNO24pSQOlNDc8nmlYdxckDoaYS2enFTqMimlcGgBy8imyISp4qWIVMVGKLXFex5v48cWdp5retectrtqRjIdx+leqfEWyNxok+xcsFyK+Y57TU4ZJWjLY3GuSrSTdzrpVGlY9e0rWIGAOeT1rZjYGQTjAXoK8J0rW9Q0/UYo5ssrHHPavYdL1BZrNNxBOK4atLkd0ddOpzaHSxTvHDvVPvfdFSyXJmtdzoWIHQVR06eS5WTP3V4X6VbZljtyFHJ6moV2gdrmGssU12YmiUZPJbtVmXwvZXrwywuY3RsjHesTULtra+G3aQTyK1dM8T2bkl5FXySFxnvWtOGuhM5aHTadpEdtENjl4w25c9UPetgxxoVGwEn7wrkm8W2YtJZIZQCjFHAPQ1yuu/Ed457eWwlLT2xzND2da9CnBnFOR33iKxs7uExtErZ69mX3rzzUY7rRr0QRyJMjjqTyBW+/jnTtV0Vb+0/wBYg+cd19jXI67rlpd2X25Cokf5SPQ12x0OcpyRpqU7Q/ZBvOdzYxXMw6ebbXlhIKAPxmtg6oixRhWKysOqtRFBJeSpJgtKpypqpS0BLU9I0GYwXIgOSNnQ112iKn2h9g288iuI8PTtLM8V0uyZV+Uium0G5lE0qH5tp+961mimW9YJXUlKsfl5rb0nUPPxGwwfrWAk/wBs1KRcHjjJ4q6ksdk24H5lPIFNrQR14X5aVVqvp16l5bqQQTire01Ag28UzbzTjxQuSaYAB7UEHFSgcUxjSAgIIpOtSEE00KQaBFGaRRyahS4VT1xUEkxAwRmmQW8kj5wQKi9zW1jWhnyKm+9VeGIovIqzE65xRcVgMeFqER5fJ4q/uULUDEZq7EAFwKawqVSuKRiM0ARjevQU8O+ORUiYocZosBzPizD6TPnptNeGwJBJJMj7eCa9+8QxRvpsqkZypFfNt8HtNbuIlYjLHGa5a0bnVRlYr6pYRh/NRBuB4q9oGptHIEmfnoBRIpaBS56dawtRjazvUuYD8veue3MuVnQ9HdHrWk6huAjGBuq1fXErfInEY4+tcF4T137XfKp4A611uoakoUhSFGOKycGi1JPU5rxJI6q3lgkjvmvMobvU31G5gjZ3Vjk49a9PkIvXKMwwepNa+heGrOLczxJvc/KuOT71vSk4LYxqxUnueV2Umq2UzgROUmHzjrk+tLqek6vc3xuUgdAygZHQjFe5weHLN5sNCueMHFaep6fZw2JBjAj29h0NdUakmc8oJHzhpa6rZXJiiDhXPzDHWukOkzvYtJKAe+zpitu71O1tJ2ljWGSMZDHuKy5vFemXl0u9THgbcqeGre7ZjZC6elhYTRLeQxzM4+Ur2rTs7Q/2mpjkC5OQo9KsaDaaFqLvNuLuo+6T0rY0nTIH1F5D+6jT7pp30A6rR9PeG3kkuYkwRwx61dtlW1jaaIAqayZZ7gw4hmEqL/CTV6G9RrFokQA7ec00gZXSW4aWaVCqluRjg1maVeXV9rDQTKeD17Uy0tp5JppBK0eM4XNM0KaddbYqv3Ty3r9au4judJnm0/U/JlOUbpmuzRg6AjpXm95fONTh3cmu40658y1X6Vm1ZgXHHNOjU96jDZNPEm0c1IE+0YqN09KcsgPenEgiqEVyCKZzmpWPNIFJqRnN23zMO9bVqmAM1SWBYhkYFPNzsHL1nF2NZGqygrwKquxTPGKgivC/Q5qXy3l6mqbuRsRtdsO4qJrsk8nAqdtPz2qldWjKc80eoX7FlLsdjSvM7DgflVKBG29KtwsAecUIB0MkpbvirihyMmoVdAc9KtRyArwaq5JSvola2bcM8V8y/EG5Wz8Uy7Fxya+o7gB42BxyK+dPjJon/EzE8J5PJxWc1fc0g2tjhrzW9lgfm5PSsuPWGuNsUjdeKbbaJdXy7WyAKdceGLiCPzEJ3JzU8sNi7y3NXw/drZ3bNuxzW7cajLLKxDEkjivNjfTW96u4EYOCK6uz1AOA+c8VMqdkVGdzYsr/AMi6RWyz56epr0zw6jpC8sg3XDjJJ7e1eS6dODq6OQDzxXcXPipdHCwIcySEA0lC60Bysdnb3txN4jltgmIUiGD71nX1/qXneTsDKCQ6N3FUtN8Uwx6/GrciRRlqy9a8a2I1ORQxSWFyGXP3hWijJENoyL7wZ5skzxs0aXPOzHCmueuvAMdm+1LxQ5656V3MXjbR44GUXw3do3HOaof8JbY6vfGzW3xM2Am1c5q1zLch26DfB+gyWNvIwVnJON+ODXS7TERvX5W4yO1dPBaW+k6PBEVwzD5t1Z9zboqMIyHB/hq9yTP09RBcljLui71FfSSG8BtJMxE/NjtUiWIBBgkxu4ZWrJ1LUV0e88hcB2q0I34r62iAiD/vz1Gef/ritXTbaKPMxADNzXC6Ylxd6h9qlHvXUT6i8trshBR06/40hmhNaTPfrOWzGD6V2OizBkAByBXFWl8RY7J2ycdzW/4XvCww2cZ6nvQwOwC5p5Q4p8YBUGnHFSIgUEGpC+B0pQvPWhhk0CI+tAJBqXYMUeUKAOYSedxt2/jSvBJjcRzT0uoZJ8Bq1kiiaMVjHU1ehnWS7X+bgVuwmPaMVnvFCnQ80sTkHg8U1Ll3E1fY1C647VBKEcYODVC4uzGp6msefU5w3yA/jV81ybHRC2jKnbVaSw+fIOKoafqUzybZK21lBUGiyC5SFowPzNn2qdU8v6VJuXNQXMuE7UCFnkHln6V498QFWWRgyjBPWvSzcNJIVPI9q89+I1ukNuJznjmpmroqD1PPY41tyFROOpNTrNBK+0gelZf9qZiYRjdI1VbdbiMGeViFHJHpUcuhrzajdZ0CB90qIM9a5UO1pI0ZyK6Z9ba6lMCDgd6xNSgLMWx8wp2tuJu+wW2ovBMsyjJHSp3XVNRukuXRsE5FT+GNKF9cIJVyM8CvSre1sw4tzGMxjAAHU0uZx2Hyp7nAG01hUYdJtwZCO1Q3/hjU9bnW6I2vjbJ9fWvX4LCzkSLEZDqcPxyvpUMumvE10gl2g8gmn7RicEeUWfw6uDIPtE5VSfvZr0fwp4U0vw/dpfvJ9oKDA5zzUV3oeqTzBbbpMAODx9a1Y/D02kaRi4mUzN945zVp8xD06Ghea59ul2sNke7C1VvpjHexsrbCox7EVRsrUPGd2TtOQaq6rfmWNdpyyMMVV7kmpPqaZJOFb1FcvcA6neSFxnyzxW/5UX2SKcjccciudvyRciWMFVcgHFUmBb0/VPs5MbH7vANbialFFGH3ruIyM1gR2CyxyMhySP51XtbSe6+SYMuwdRVLQR11s5vSEJ2ox/Cuw0p47ZViQfMOv1rkdIjWG0VZDkrW/p8nlzZGTuoeoHoFldboRuqw0wPesnT3Z4QAK0Y4jt+aoAlWQ04Pk01U+tOCHPSgRITgUzeD0px6UzIzRcLHn9zHL9p325KsPyNXJdTvYLPI+8BWhZalZXBwUwfcVZujZPEwwp46VlbW6Zpc42PxFqE1xtOMA84FdJaav+7G8HNZayWNtc5WMAZ5rdgls5og20dPSlJJ7Dg7bjJtRhaPJ4rOOpwMcBgam1iG3ms28o7TjtXI6Ytyt6UlDlSeCRikkluU2+h1sF2gbcDzWimobgFVuaz4I7ZVCuVH1p0lqqkPCc49KvpcjrY0gbpmBUjH1qbyXkXD5NZseqPbJh0Jx7UDxNAX2nKn0IoTTQPRmktjtOQMVyfjvRPtujyM3RRnHrXQr4hgxywrN8Q61by6POFZTlTSeqBaM+bln+zasY9m1d2MmtS6US20g6K/Qis67iEurysx+UNzU0+ojAhTBHQUots0krDtN0+Jcv5f40l3pgmLbFzV6GcLbY7ip9MuE86QnHA71OtxrYi0q0TSdPeZsiUmrFrq41AtDahknVgd3fFRyyrcQshYkjLfSuQtdQm0fxAtw27axJ9qI6hLQ9EfxHd232yCYFZWACOB1x61V07x3FIHtb9d56KSOtc/qni0Xk9s6xn5sEtjv6GqN1afbbgvcR7ADu3IMVryrqZXO503x/bi++zQK7bDjb1xVy91p7+63mQlP7vYVzlha6VZaa9y0ZSU9GPGaIdShnjATauDzg1fLZXQr3ep3FmFWwbLYLDrWRHpwyFJ3HOabHqKm0XDjGMUR6xbxz7GYZHNZ6j0NeO2jiiAZsjjion0tLuBgvBXGD71Ri1qCW82swx2rZju44rZ2BGMdqtJibRSs7KK2DRE8sOKjTdG5RV4B60lzdjIdTisqbVzbFlJzuNVqSdGJlhgwjZY9K6DQ1eeNXYYPcGvO9P1AtciQ8g9q9G8NXS3MgwMLTeiA7bTVYxjI6VqqGx0xUNnEiRqavZUrxUgJGBU2xfQVBhuoFNMxj+8eKaYiSTjoKixnrSGYN0NIpJPPSkxnnnh/wC0SRA3SBHI7muht9NVpt74ZT2rJv8AwxqLAyWk3lMO1TWVnq9pa7Zp9zepFc6VtZI3bvpFmzPpdiUJMSZFYr6pZ287Wx2qRSm7Nsh+2TcmsDVbiK5ztTHP3+lDnCbtsJRlDU3be8gaY5wU9autc6UOHkjU+5rmLWe3igRWkUH2NLqOiW97GHlY47YbFRF8rszRq6ui7f3FkZsJOmM9jWrpN5aPGEEin8a4ldItHbywx4685qWVn0vaLOMy/QdKtSV9CHHueli2t5Bng5qvPpNoxzsXNefweML1H2SQsmKtz+LpPL3JKD7VrddjNLzNHxBaQ2du0gO1QO1eWa94qS2jkiBJJ6HrXQavrd3qUDKX+Q9QK881TTmnckMB9aHPl0GoX1MLzxcTMWLK0h61bitYYJCxk3EDIzWTep9mfYzcg+tM+1tAuTlvTNJDZqLfNvcE8Va0qZpLp23cKPzrm21JNhAjOT6Vv6bbz2eni4mjIMvQe1TJDiSW180eushPyOpz9a17jSobixRm8tg7cjuKwljWS5feAso5UeorUiuvO8uB18uQcgZ9KXKyrl210WyjyJQDnhR710ei6Za3zqtxa7UiOC2axLZ4bifzCjJvwMA8g122nW32e1eQuFJXIJ6GrVyGef8AxKmtLVkSzkxGn8C9K4K21VjMHDbPUVpeN9YnudZmi2RhFOMKK5ASMpJrpWhhc9Dt9Sf7IApz9Ktra3F8nmDcrAda4PS9Va3uE3MdueRXfW/im2t7YZj4x1FZyi+haa6mXdw3tvgqx3qeK0LPxBdxART5xjFb2nDTtetspcxo3uelUdZ8NmwUS+YswPTFOClbUUmuhk6j4pZsRRAl2OKrpc3E5Uy5wKwr66ls9WjZohsyK6s25n0lr1MAbeKqwjV0aB2kViQFzXoHh+/EM/kjAb2rx/R9YfyGjeQqwOBW1pmvXVrfIBliahq6Hc+mNM3zW65Y1omJlXjmuS8HaxLd6chkQqcd66xJC55rKGm5UtQW42fKetJMRKOtJMsZ6ckVUeZw+1VOK0d3oRoixGyq20kVbBjI7VSijLctT3QDoaSdh7nDa145uNJmCS2jBCcBxyDUa+MYb2ENKGjVumDn+Vc9qvnXcgi2vKC3OEOBWra+FYJpLa6RjE0QyyKeGrm9rzLVnR7Oz0I77UrZ0PnEYzkUyeO21Cw/dzFFx2FdJNptvPGQYgG6bsdKpTeGI7iFU+0uoHBGOtZxim9S+aVjk5dARVjkgmeRT949cVU1Xw54hfZ9hvZHtz2zyK63T/C6aYsyJLLIrcgs2akF1LpmkvJJOdqnqy8it1JRla5k1zLVHG6fomr2Dia7uJSo4wOldFM9/bWyz2sCyDqQ3erNjqw1SIiVFkiB++OAavG+sJALeKQMcYKg8iqlaUrkx0jY52S9fUIHa6t0t2/vZrjb62njuSYpBKvsa72Z7DzJLcMJXUZ2E81z11c6dJE6JbzRzdvlyM1pTnKDZE4xklcx7eYxJk/e6kViXM63kkkiDAU4Ipmoz6rZ3ePsMhQnsM5FZM+uR2+6KWJ4mY5yVxUSXNJvuWmkkirqGnwyzNM7YC9KzprZAMtJkMOKm1K6hvLVgZGXupHSq+lzRXVzEknzBPvZqrWQr3ZoWWkRQWyXEiK248bjVy4vkMIjlYlDwCvO2tW1skvNQAIVbeMDOelXr3RIbto1mHkQk4GwYLfSsm9S7WRxz2EsryCGVtz42uRyKtIoaaJZ3KSx/L83GfxrqotCs5GdbZnR4uz8mufEQu9SELg7Ym+d8cUc19EHKjpNF03GyaSJcHhtr5P1Fb2sXK2OhzIHZiEIAJwRUdho8VvCjxyfuxzkHqKwvFt5JqsYgsSpZeGI61UJXYpKyPHdSndrxyzkkk9aqPvwD1rc1PwvqCO0hj96wZIp4HKOCMdq3TMWhyOQelaEF4ohZJCxrLEvJBFG4HqcCqFsaMeoy2smbaVl/GussPE1xqNn5Vzc7Qnr3rgN4B4zVi3mKNkHimB3utx2k+kpKBmUc1BpmtoNN+zSttQDpmuchl1PVmW0topJmbgKgzXpHhH4EeIdZjWfUGFjEecNyx/CjmSDc4eUu9zutQSWbgDvXt/ww+H4u4F1HVfvNyENdP4e+DWm6GqtKgunX+JhXfWehQR24jTKADoOMVk25O1irW1I4LK2s0SGAL6YFXWt5mX5OKgXRntnLxSsWP8Ae5q8kk0Uf7xc49KFDXUHIopa3cTEk7xUufKUtKOae+qqCQI2JHtVaTUBKp3oV+ooduglfqLHdhiwXB9Kp3Ul1GGcVRg1mxk1BreNiZR1BGBWqjiXIJ/CovbUdrjF0aygUhIwPxzXP6iWsJibYneTwgIAP1qxqOrvp+kvcXD3DFccQgFz9BXMadrNlqGuwyBCkeDlZbZ9+f8Ae5qJQTV4qxcZ92dHPfz20ZYoZ/8AZjXLD61Ql1u9mQC3sGgbOM3Q2qfyrXY2k6ZYbsdQQKZC9m9wxieJ3HG0SBiD9KfsdLuSK9prZJmZPqeqy2RT+zY593yg20vQ++cUyDw7cXUCG4mniB+9GX3EfjWqLZpbxcySx7eco+FPsRWPrml6bZXIvrzxXeWMe7OxZhtJ9OnSpUeZjcuVXNm10extkMcIC5+8B3rCvPB9lFqP2yKe4SUnO1H61VF9oN1dpHp3ie681vuhOVb25Fbq6aslpHHIJXPXdG+0/XNNvl0tYStLXc53UoNPt9T8wB47jZwc9ai069s7GZmNq8izNzIeQK6NgtlbOZLOdtoyJD8xP1NOi13T5bVUuUjiRlyplAAPtSvK2qJ91PRnJ66ls04mtcTyjsqbgPxFcbrOmxi5LXFwrsRnaUBA9sivWZfCjXlrK+nSi1E/3sKCjisjVfCdroyW4WEuhceZ5alsn1PfFZRVnzPQ1lK6sjxy80i4u7Yiyij+zj/pmetZA028067jkurU+SBnKr1r12TX7bTJXkglJgmJX/VHdCw9VIq54buX8TyTW1xfWtweQEktxGwHritIN2u1p6Eu19HqcVopt9TvLdIwIYh8zjPX2rVhtIrzxPM7SuYoMRrETjHvV/XvhHf2d2NS0u/WJw2QkaYH1IrD0rwV4on1ae4hvISwYGRnBGaHpox77Gx4jhGn6Q19Aqh41JIXuK5/wJcQaojh4xkkkluQTXcJ4E1290ea2upLZmlPJDEjFYtp8K9e0a5kks9Rt4UXlUdSVP5U1aMbid3Iv32VshY2mDJL8o56Zq7pHwjhjgWaW7l89xltpwM0ySPTrTU4RdaqhukUBiF4De1dLd6vqel2zTyXkFxGFygICEj+tVFr4bbkSvvfYwL74SRTDK3jlu4bvXPah8CLKVmla4K9zjtXp+iatceIrCKeMNDuGTkdfpntWyukK5ZpyXLDBGeKS1fuplPRanzrcfB/TrIf69rmSQ4VR1rOn+CksdwX82RYepBTOK+m/wCxLWL54okUj2rN+z3Bu90ZVFRumc7qlucHqx2jJaI8K0z4GRXk6oRcsh6ybNo/Wtu9+C2h2Fuypa3VzJ6g/wBK9c1Hxfa2KGCRZoXA+8ISR+FZ2k+L7C7nklluI9oOFTHzn3xV6uzWpF46p2uct4X8HQ6MIptKshbSxjkTp96vQrDW9QMRSfT0idOMhvlNaFtf2F0T5TqSOvTiluZo1iJj2N2zkYou47MLX3CG/uJgQQin2qWK6dc7j0qjHExUyO2OOfTFNt443cFLwsgb6g1Sbvdi02NP7aSDk1UXXIPOEThw5OACpq4YVIzgMPao3toXZSycjpiq1E7dB7NA6cyIufeqzXtl5nliaORvTINNvNLtL1Cssef0rItvAumQait0rSqVOdgc4P1pqzWujJd09EaNzbWAJmEYSTrkCqDCcMDFLkN6joK6yOCJUA8sVFNZwOchAD7Ucj3DmOBu5YZ7k2clo7tblGBkt94lB6lORnHc9qz9YufE9nq++G2sp9JOFWNZ9k5bHYkYzmuLsvH8zQ3SxC7knuBtEt9c+YE7fKqpha6/S/EuiTQRjVXVtRhUR4Vd+T2wVHQ/SsHQqQd2jZVYSVkzdt7+znuXtjJJDdQKC6Ebj9c4w34Vzl5pHh7UNQle2vbiO9DASEcK3PB4H15rqWgY201zZWsYvipHKZPtkgcisL/hH769ED3SW0dwrl/NB+YH6YA/Agiikk03LQmrKUWuRXM77EdMjigt5bi+Mc4nLNMzLkA8bQc7av36LcPa3TaLHqIIHmmNVZk90z98evpUt3JY2xSy1HUFWVSCRHG0S5I7upHGeSPw4rV1HSjPaNHZRQwXL7QZSCdgz1wCOcUSSTSsEXJptmhBbaWY42itYYShwNqAMp9Pami9sbe6kbyzuBxIzSD5QO+Cf6VgSaDr0RlNu9lD5nR4XKNn+8cqf5ms201my0GRn1W6s5b1ioM1urTEqODk4AHTqD9a1cWl7uvyIU7/ABK3zO0TXIbtdsCEEkoMpkg9jjuKrLbLqCFpLVp5YCVEskITJ/2QR/8AWqppmratNHFLYW1je28+ZEd/MgcKSSAQVIz+NbEOveY6QPHardEZMS3Qzt4yRkcjkVD1+JlrTYxNUbVbVV+wQpBvUKzTuQM+gC5A+tZllpGrvDczPHZW88oAWSN3dnI7HJ4FdPqviW2s7SaVJ7ZPKGWLZkwP91ea8zvfjBfS6sLaw08XcD427IikjHPZTu4/WkoupG0NQclCV5nTWvhGyhMoubSJlnCiSNzkO2c9Tx19K0bHTIdMZ47eyijDgnzII9ij0DEnP4itWxkS6t4mn0yZpYtpHnR5ZSRngt6e1ZnjDwWniizgDQSh4CSirdNCMHrnGQf881HJKSTvcrmUdkc/ZTeLYtaubaQ26BjuihM6NgfQncRirmsPNJ5WlDVG068YhhOICEl/2VYdPxqLRfCl3pN9HHeaTHcWkQyHnunmdcdGUHIB+n51para6gLqWfStVurSKMDzLc25YFj3UnjpVyvzWsiFor3f9fcYtnf67pOqCGfX4LmJcb7cRtM5+jYAH5119rrC3IZbyGG1bdiHfOuZR6gVV0m2u442W+ulugvztviRd2Rnb1yMY69Kkt7fTNTurn7TprJcRAOsd1CHyP7y9cj6Um7pocbporWlnp15qNzM2nwg7h++JDgn24wKNQ1SwF09jcRNIBgbDFk/gaZFp+sWujXOdTiimkP7hTEFijGc42lfl445rnptZ19rWObUNHt7+KJwRcxk4LA5HKn+lVD3tCZy5Vc6GwmRNZM0S3kKMv3ZfkXPoBRc6Zrcl3c3C6xLBE+NqFuF+lYLalqepWMl1BPf2L2RWWa2eRHaVWP3hvGVUe3rXQWFxJYQLPdjV7wzE4WYoyj8MDj0qYxlF3QOUZK0i09zeExWluJbyWMDzZCdoBP8zjnFUNZ3Wiib7MdQYNnDv83sqqvv3rcWbdOJRGI08smSFiPMHb7oz/OqN54ZhvruOQ3M0UBTaLaFhEo44JYc1UZQW6FKM3syzpovWtVu76S3ww3NGRxD/s571CbLR9bmljbT7eYqMrJtx+oqxpfg+DRbmSa2VfJkX54QGbJ/E/0rat0tI4htgEJx0KbTT5NdNB8ztZ6nKwaTe6WHk0/TbKCQ8MzyM2R7Vr2ZeNfKubXc7HOVTC1X1k3F9ttbPUYrORWycgMx+h7H2q5HaCO2givJft0oP35PkY+vA4/Cpa0Te7BaXUdl6GTqHjC105/Le3bbkoQwxgitTSLy0vrJp7d4jG/UKOQfSq+p6ZBf6wkVzGXtnhOzb2YEZ/MVDPq+g+HJ0tjeWmnSyjIDRffAOM8VtOEUkorUzhOTb5noWbaHVxfMZbj/AEZj8oVQCB2zS3etz6a4hlV5lJOZIl3bF9T3q4mqwT2y3EU0U9s4+WSI7snvT4L/AE+cSIFYSovzkxHPPvjmpSb1LulpfUyZrvVN+1X8xWwyEL1FXLa91Avua03468YxU0MQEDRxSSOMkkyxkEj0HAqt/bFzaXBQyWPlg4PmEx/gDzmtVJS0sjLlcdbs2orw+WGyAD/CTinDUY/P8oglsZ45qGG9tblAHjiLEcBWDZ+lVb77NBKJWuZIB0wybkPtntUJ9maNdWjn4vBvhmUfurSHAJBEZKZPcHbjP41fsPCekabE8dvbbUkBDhju3A9uea4Gxv8Ax99oieS1s4bIBXk82RWbZnk5XnNbPiXxlqnhp4ZzBbT2M+dm4sHBHrj25qoycnyuz9NQlHlXMtDqI/DdhAVazhFrImdhhJXB9SM4P45rK8VXGqafYb2l/wBFDKZJlZIWjAI+8WOCp78Vyt/4uvPEHkwQRzwliD+5umQHvjGBx9asQx7PEKQXgu9SWSLfA08iMkchGcqhHGMAAmlUdn5ihqilq1tflZNXsre0+ywSRuLNEW6L+jZ3YC/gPpXTQNcTyxanZ/2g98Lfb9mN2rQbiOpQnkg/Q/Wljt7jUopEnjW7lOFeCaQpE+OuQufbgDFVNVtdBtitmmkSwXF3krJbOEZSOpVs5X+tZXu7SeqNErK8Voy/cya60iJPcRwvKOIwobAzznC89eccVlTaQLGyliBtp7+4cFIVt0jYAn5vnIO0EA8jHHTFQWPha+S/hWLxBqDqWYeXLITtA/Hnt6fSt/T9Q8i0jki1N9Q3kokUkOASOCAeCK0lLXRr7iIx7p/eE3h65udKxp1/bxpIhFxG5dx1ztUxkEYOfrWNaNpsSCPVVihvHLK000UlshTH8JY8N2z3q1P413QGO1sfLnV8DkKrnkYOK5nxHoKeIb4PZwSrexpGLtmZRGrMeOd24kdCcHgCiMVN2noLmsvc1Ni61fRNPQQadrtrCC4JKzvMT2ALjP5fnmrWkw28GpLrMt5FIryFixlCqWxjKqRnj0GK44/CTxEQ/k3GnOD23sMkZ4OVra8MfDfXdO1aC41S609rVeJbXaZhIvcEEAfj1FXKNGMGoyX3CTquV3H8T0ldbt0VPtCtCrsFWTBMZ/4FjA/Grwni2gqxfPTFcVpul3GkanLYS2tjFptyfMMdqv7vjuUYZGeBgE+tdOdWstOeK3nn2mUHygFJ6fQcVhzPubWuRz6vGFMN2r2DybliEkiAyY7g5I79Dz7Vg6j4an8TSJb31/I0FrkbYXXzsnkFmwAPpiul1G+iitQ7Rq6E8Fh0z3FUdN0VrXUBPaSId+TIdoVsHkAcYP44NC11Qn2MSPwjqmluqaZawXsUyhZzqV2+5QD0VUGB9aeljdx3b6nqfkyeTF80rQmBoF5zsYDJ2jPUV25F0sir5SMmDlt+CD2GMc1m6lcXxSaEQCCMxkrebgwQ+hTr+Wacl1JijjHGreJLtv7E8UPFa7VKRs4Z1GeWYjJ+gOD7V3NjYNHaRx3lyJ5k/jCbc/h6+9cxY6qNQt76HQo4L7ULNUyTmLzCeoLYUjoemeK1dR1G90/ToZ5tLZpMAzJHOuIz6ZON1Jvui0vM010PTU1JtRFtD9tZdhn2Avt/ugnoKkm022kUs0UW4dGZQSD61gnxGIgv2y1liDgndE4cAep6HuOlWAwWCG5tPPuY52Xa3mZIU/xYfHT0zmjnT0aFyu10KZZLG8CvHCySMESTIUlj2H1rMvtebT5bjzEhdAdqh5Pnz6jHFbcd+96slmiSREEolwERgCP4tpPasq6tri+dLP7Vcuqf62Zwn7zHU7RgLn2FVCMb+9sTJyt7onh/xZBdhNP8y4W7csEM4L7j9SB09PatcyttVZ7re0KlnfhM45yQOBWbBb3UnhdLqwiikv0DeV55wrHJHJAyO+OnvXnEvjG7hvNt3EEaKQ7hBiIsR1BPzAjjoa6YUPat+zW3mYSqOCXO9z1CTRLPXP3/ANnMUudxcEqWHY5HY1eOkXrWJtYrr7MMALIjFnXB9T1rmbXxsdetorbTnGnahKdsXmR+ZGxxnGeqj3xT521Tw9pYvtb8SXkrI27ybWNcOf7uWHT8BU+zatGW/RD5ou8o7dWb9ra6vYyOt5Kl5AEG2SNcSlvdfu4qO60/7XcpdGJEIwMzRKzKM8j2psXiYjw+uo3FnMFK79jMhbaTgMccfh1pkXitH1u20w6ehluEVwBJyikZ5yuPyNRyNvmRfMrcrLTxy2rhhco0ec+UUAH/AAHApk155NnK00qxhTy5Xdt9jtxWhNf2UFzEkkUQeY7B8pySO3T3qZbrAffbLGOTkEHI/Ks7LqXr0M20v7wiITrHskY7ZE5BXHGeeM9sE1z2u6Fo+qWcl/a+ZY3KHcZNhVGIPOQeOfUVu6paXuoWssFiwtVcAiVWwT7DjjtT9A0y90+wMV9ePdSE5DFidox0rWLcPei9SJJS91rQ4S18LapqBWeGaN1Q4WZpCp+g25rodJ0i9ikeK+vbm5iDYMLQ5hb6M3Jx+FdSLZUYmPcvcgHAzUTxqI2JUYAxj2qp1pz0ZEaUYan/2Q==", "receiptTarget": {"company": "BOOK TA .K (TAMAN DAYA) SDN BHD", "date": "25/12/2018", "address": "NO.53 55,57 & 59, JALAN SAGU 18, TAMAN DAYA, 81100 JOHOR BAHRU, JOHOR.", "total": "9.00"}, "baseOut": {"company": "BOOK TA .K (TAMAN DAYA) SDN BHD", "date": "25/12/2018 8:13:39 PM", "address": "NO.55,57 & 59, JALAN SAGU 18, TAMAN DAYA, 81100 JOHOR BAHRU, JOHOR.", "total": "9.00"}};
+(function(){
+"use strict";
+var root=document.documentElement; root.classList.add("js");
+setTimeout(function(){var r=document.querySelectorAll(".reveal");for(var i=0;i<r.length;i++)r[i].classList.add("in");},1400);
+function W(fn){ try{ fn(); }catch(e){ console.error(e); } }  // isolate each widget
+
+// theme
+function setTheme(t){root.setAttribute("data-theme",t);try{localStorage.setItem("vlm-theme",t);}catch(e){}}
+try{var st=localStorage.getItem("vlm-theme");if(st)root.setAttribute("data-theme",st);}catch(e){}
+function curTheme(){return root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}
+W(function(){document.getElementById("themebtn").addEventListener("click",function(){setTheme(curTheme()==="dark"?"light":"dark");});});
+document.addEventListener("keydown",function(e){if((e.key==="t"||e.key==="T")&&!/input|textarea/i.test(e.target.tagName))setTheme(curTheme()==="dark"?"light":"dark");});
+
+// progress
+W(function(){var prog=document.getElementById("tprog");addEventListener("scroll",function(){var h=document.documentElement,m=h.scrollHeight-h.clientHeight;prog.style.width=(m>0?h.scrollTop/m*100:0)+"%";},{passive:true});});
+
+// TOC
+W(function(){
+  var toc=document.getElementById("toc");
+  var items=[["part1","Part I · Building"],["s1","1 · The splice"],["s2","2 · LLM backbone"],
+    ["s25","2.5 · Attention zoo"],["s3","3 · Vision (ViT)"],["s35","3.5 · Resolution"],
+    ["s4","4 · Projector"],["s5","5 · Data & mask"],["s6","6 · Forward"],["sL","· LoRA"],
+    ["part2","Part II · Teaching"],["s7","7 · SFT"],["s8","8 · GRPO"],["s9","9 · Distillation"],
+    ["s95","9.5 · M-RoPE"],["s10","10 · SDFT"],["s11","11 · Compare"],
+    ["recap","· When to use"],["glossary","· Glossary"],["appendix","· Appendix"]];
+  var ol=document.createElement("ol");
+  items.forEach(function(it){
+    if(it[0]==="part1"||it[0]==="part2"){var d=document.createElement("div");d.className="part";d.textContent=it[1];ol.appendChild(d);return;}
+    var li=document.createElement("li"),a=document.createElement("a");a.href="#"+it[0];a.textContent=it[1];a.dataset.t=it[0];li.appendChild(a);ol.appendChild(li);});
+  toc.appendChild(ol);
+  var links=[].slice.call(toc.querySelectorAll("a"));
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){var id=e.target.id;links.forEach(function(a){a.classList.toggle("on",a.dataset.t===id);});}});},{rootMargin:"-12% 0px -78% 0px"});
+  links.forEach(function(a){var s=document.getElementById(a.dataset.t);if(s)io.observe(s);});
+});
+
+// reveal
+W(function(){var rio=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");rio.unobserve(e.target);}});},{rootMargin:"0px 0px -8% 0px"});[].forEach.call(document.querySelectorAll(".reveal"),function(el){rio.observe(el);});});
+
+var NS="http://www.w3.org/2000/svg";
+function el(tag,a){var e=document.createElementNS(NS,tag);for(var k in a)e.setAttribute(k,a[k]);return e;}
+function css(v){return getComputedStyle(root).getPropertyValue(v).trim();}
+function onView(node,fn){new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting)fn();});}).observe(node);}
+function txt(x,y,s,fill,anchor,fam,wt){var t=el("text",{x:x,y:y,"font-size":s,fill:fill,"text-anchor":anchor||"start","font-family":fam||css("--sans")});if(wt)t.setAttribute("font-weight",wt);return t;}
+
+// reusable line chart
+function lineChart(svg, series, opts){
+  opts=opts||{}; svg.innerHTML="";
+  var vb=svg.getAttribute("viewBox").split(" ").map(Number), W0=vb[2], H0=vb[3];
+  var pad={l:opts.l||36,r:opts.r||12,t:10,b:22};
+  var allx=[],ally=[]; series.forEach(function(s){s.pts.forEach(function(p){allx.push(p[0]);ally.push(p[1]);});});
+  var xmin=Math.min.apply(0,allx),xmax=Math.max.apply(0,allx);
+  var ymin=opts.ymin!=null?opts.ymin:Math.min.apply(0,ally),ymax=opts.ymax!=null?opts.ymax:Math.max.apply(0,ally);
+  if(ymax===ymin)ymax=ymin+1;
+  function X(x){return pad.l+(W0-pad.l-pad.r)*(x-xmin)/(xmax-xmin||1);}
+  function Y(y){return pad.t+(H0-pad.t-pad.b)*(1-(y-ymin)/(ymax-ymin));}
+  (opts.grid||[ymin,(ymin+ymax)/2,ymax]).forEach(function(g){
+    svg.appendChild(el("line",{x1:pad.l,y1:Y(g),x2:W0-pad.r,y2:Y(g),stroke:css("--line"),"stroke-width":1}));
+    svg.appendChild(txt(pad.l-5,Y(g)+3,10,css("--muted"),"end")).textContent=(opts.fmt?opts.fmt(g):(""+ (Math.round(g*1000)/1000)));
+  });
+  series.forEach(function(s){
+    var d=s.pts.map(function(p,i){return (i?"L":"M")+X(p[0]).toFixed(1)+" "+Y(p[1]).toFixed(1);}).join(" ");
+    var path=el("path",{d:d,fill:"none",stroke:css(s.color),"stroke-width":s.w||2,"stroke-linejoin":"round"});
+    if(s.dash)path.setAttribute("stroke-dasharray",s.dash); svg.appendChild(path);
+    var last=s.pts[s.pts.length-1];
+    if(s.dot!==false)svg.appendChild(el("circle",{cx:X(last[0]),cy:Y(last[1]),r:3,fill:css(s.color)}));
+    if(s.label)svg.appendChild(txt(X(last[0])-3,Y(last[1])-7,10.5,css(s.color),"end",css("--sans"),"640")).textContent=s.label;
+  });
+}
+
+/* ---------- SPLICE ---------- */
+W(function(){
+  var row=document.getElementById("splice-row"),btn=document.getElementById("splice-toggle"),hint=document.getElementById("splice-hint"),on=false;
+  var text=["What","breed","is","this","<image>","?"];
+  function draw(){row.innerHTML="";text.forEach(function(t){
+    if(t==="<image>"){ if(!on){var c=document.createElement("div");c.className="tok img";c.textContent="<image>×64";c.title="placeholder · width 576";row.appendChild(c);}
+      else{var b=document.createElement("div");b.className="imgband";b.textContent="64 image vectors · width 576";row.appendChild(b);}}
+    else{var d=document.createElement("div");d.className="tok";d.textContent=t;d.title="text embedding · width 576";row.appendChild(d);}});}
+  btn.addEventListener("click",function(){on=!on;btn.textContent=on?"← Back to placeholders":"Insert the image →";hint.textContent=on?"The 64 placeholder rows are overwritten by image features.":"Text only — the model sees word embeddings.";draw();});
+  draw();
+});
+
+/* ---------- SHAPE TRACER ---------- */
+W(function(){
+  var out=document.getElementById("trace-out"),step=document.getElementById("trace-step"),rst=document.getElementById("trace-reset"),i=0;
+  var steps=[["input_ids","[2, 512]"],["token_embedding →","[2, 512, 576]"],["ViT(images) →","[2, 256, 768]"],["projector →","[2, 64, 576]"],["splice image rows","[2, 512, 576]"],["decoder + head →","[2, 512, 49218]"],["cross_entropy →","loss (scalar)"]];
+  function draw(){out.innerHTML="";for(var k=0;k<=i&&k<steps.length;k++){var d=document.createElement("div");d.className="tok"+(k===i?" img":"");d.innerHTML=steps[k][0]+" <b style='color:var(--accent-ink)'>"+steps[k][1]+"</b>";out.appendChild(d);}}
+  step.addEventListener("click",function(){if(i<steps.length-1)i++;draw();});
+  rst.addEventListener("click",function(){i=0;draw();}); draw();
+});
+
+/* ---------- ATTENTION HEATMAP ---------- */
+W(function(){
+  var cv=document.getElementById("attn-canvas"),bc=document.getElementById("attn-causal"),bb=document.getElementById("attn-bidi"),causal=true,n=12;
+  var scores=[];for(var a=0;a<n;a++){scores[a]=[];for(var b=0;b<n;b++)scores[a][b]=Math.exp(-Math.abs(a-b)*0.35)*(0.6+0.8*Math.random());}
+  function draw(){
+    var ctx=cv.getContext("2d"),cell=cv.width/n,dark=curTheme()==="dark";
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(var q=0;q<n;q++){var row=[],sum=0;for(var k=0;k<n;k++){var v=(causal&&k>q)?0:scores[q][k];row[k]=v;sum+=v;}
+      for(k=0;k<n;k++){var w=sum?row[k]/sum:0;
+        if(causal&&k>q){ctx.fillStyle=dark?"#12151b":"#eef1f5";}
+        else{var t=Math.pow(w,0.6);ctx.fillStyle="rgba("+(dark?"139,131,255":"79,70,229")+","+(0.08+t*0.92)+")";}
+        ctx.fillRect(k*cell,q*cell,cell-1,cell-1);}}
+  }
+  bc.addEventListener("click",function(){causal=true;bc.classList.add("on");bb.classList.remove("on");draw();});
+  bb.addEventListener("click",function(){causal=false;bb.classList.add("on");bc.classList.remove("on");draw();});
+  onView(cv,draw); draw();
+  new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+});
+
+/* ---------- RoPE ---------- */
+W(function(){
+  var svg=document.getElementById("rope-svg"),range=document.getElementById("rope-range"),pl=document.getElementById("rope-p"),aO=document.getElementById("rope-a"),bO=document.getElementById("rope-b");
+  var cx=94,cy=94,R=64,stepA=0.42;
+  function score(i,j){return Math.cos((i-j)*stepA);}
+  function draw(p){svg.innerHTML="";
+    svg.appendChild(el("circle",{cx:cx,cy:cy,r:R,fill:"none",stroke:css("--line-2"),"stroke-width":1}));
+    svg.appendChild(el("line",{x1:cx-R-8,y1:cy,x2:cx+R+8,y2:cy,stroke:css("--line"),"stroke-width":1}));
+    svg.appendChild(el("line",{x1:cx,y1:cy-R-8,x2:cx,y2:cy+R+8,stroke:css("--line"),"stroke-width":1}));
+    svg.appendChild(el("line",{x1:cx,y1:cy,x2:cx+R,y2:cy,stroke:css("--muted"),"stroke-width":2,"stroke-dasharray":"3 3",opacity:.5}));
+    var an=-p*stepA,x=cx+R*Math.cos(an),y=cy+R*Math.sin(an);
+    svg.appendChild(el("line",{x1:cx,y1:cy,x2:x,y2:y,stroke:css("--accent"),"stroke-width":3,"stroke-linecap":"round"}));
+    svg.appendChild(el("circle",{cx:x,cy:y,r:4.5,fill:css("--accent")}));}
+  function upd(){var p=+range.value;pl.textContent=p;draw(p);aO.textContent=score(0,2).toFixed(3);bO.textContent=score(5,7).toFixed(3);}
+  range.addEventListener("input",upd);onView(svg,upd);upd();
+});
+
+/* ---------- GQA ---------- */
+W(function(){
+  var svg=document.getElementById("gqa-svg");
+  function draw(){svg.innerHTML="";var qN=9,kN=3,Wd=520,qx=function(i){return 40+i*((Wd-80)/(qN-1));},kx=function(i){return 100+i*((Wd-200)/(kN-1));},qy=118,ky=34;
+    for(var i=0;i<qN;i++){var g=Math.floor(i/3);svg.appendChild(el("line",{x1:qx(i),y1:qy,x2:kx(g),y2:ky,stroke:css("--line-2"),"stroke-width":1.4,opacity:.8}));}
+    for(i=0;i<kN;i++){svg.appendChild(el("rect",{x:kx(i)-24,y:ky-13,width:48,height:26,rx:6,fill:css("--accent-soft"),stroke:css("--accent"),"stroke-width":1.3}));svg.appendChild(txt(kx(i),ky+4,11,css("--accent-ink"),"middle",css("--mono"))).textContent="kv"+(i+1);}
+    for(i=0;i<qN;i++){svg.appendChild(el("circle",{cx:qx(i),cy:qy,r:11,fill:css("--panel-2"),stroke:css("--line-2"),"stroke-width":1.3}));svg.appendChild(txt(qx(i),qy+4,10,css("--ink-2"),"middle",css("--mono"))).textContent="q"+(i+1);}
+    svg.appendChild(txt(18,ky+4,10.5,css("--muted"))).textContent="3 KV";svg.appendChild(txt(18,qy+4,10.5,css("--muted"))).textContent="9 Q";}
+  onView(svg,draw);draw();
+});
+
+/* ---------- KV SIZE COMPARATOR ---------- */
+W(function(){
+  var range=document.getElementById("kvsize-range"),val=document.getElementById("kvsize-val"),svg=document.getElementById("kvsize-svg");
+  var L=30,hd=64,bytes=2; // layers, head_dim, bf16
+  function sz(kv){return 2*L*kv*hd*bytes;} // per token bytes (K and V)
+  function draw(){
+    var ctx=+range.value; val.textContent=ctx.toLocaleString();
+    var rows=[["MHA",sz(9),"--muted"],["GQA",sz(3),"--accent"],["MQA",sz(1),"--img"],["MLA","latent","--good"]];
+    var mlaLatent=192*bytes*L; // single compressed latent (~3×head_dim), not per-head K,V
+    rows[3][1]=mlaLatent;
+    var max=Math.max(rows[0][1]*ctx);
+    svg.innerHTML="";var x0=70,bw=380,y0=16,bh=24,gap=10;
+    rows.forEach(function(r,i){
+      var totalGB=r[1]*ctx/1e9;
+      var w=Math.max(3,bw*(r[1]*ctx)/max);
+      svg.appendChild(txt(x0-8,y0+i*(bh+gap)+bh-8,12,css("--ink-2"),"end",css("--sans"),"600")).textContent=r[0];
+      svg.appendChild(el("rect",{x:x0,y:y0+i*(bh+gap),width:w,height:bh,rx:4,fill:css(r[2]),opacity:.9}));
+      svg.appendChild(txt(x0+w+6,y0+i*(bh+gap)+bh-8,11.5,css("--muted"),"start",css("--sans"))).textContent=(totalGB>=1?totalGB.toFixed(1)+" GB":(r[1]*ctx/1e6).toFixed(0)+" MB");
+    });
+  }
+  range.addEventListener("input",draw);onView(svg,draw);draw();
+});
+
+/* ---------- KV CACHE STEPPER ---------- */
+W(function(){
+  var svg=document.getElementById("kv-svg"),cap=document.getElementById("kv-cap"),n=0,x0=14,cw=20,gap=4,y=20,h=34;
+  function draw(newIdx){svg.innerHTML="";for(var i=0;i<n;i++){var isNew=i===newIdx;svg.appendChild(el("rect",{x:x0+i*(cw+gap),y:y,width:cw,height:h,rx:4,fill:isNew?css("--accent"):css("--accent-soft"),stroke:css("--accent"),"stroke-width":1.2}));}svg.appendChild(txt(x0,y+h+22,11,css("--muted"),"start",css("--mono"))).textContent="cached K/V length = "+n;}
+  document.getElementById("kv-prefill").addEventListener("click",function(){n=4;draw(-1);cap.innerHTML="Prefill: the 4 prompt tokens are encoded once, filling the cache.";});
+  document.getElementById("kv-add").addEventListener("click",function(){if(n===0)n=4;n++;draw(n-1);cap.innerHTML="Generated 1 token (dark): it computed only its <b>own</b> K/V and read the "+(n-1)+" cached ones.";});
+  document.getElementById("kv-reset").addEventListener("click",function(){n=0;draw(-1);cap.textContent="Cache empty. Prefill runs the prompt once; each generated token then appends a single column.";});
+  draw(-1);
+});
+
+/* ---------- PIXEL SHUFFLE ---------- */
+W(function(){
+  var svg=document.getElementById("ps-svg"),btn=document.getElementById("ps-btn"),hint=document.getElementById("ps-hint"),folded=false,pal=["#0891b2","#4f46e5","#0ea5e9","#7c3aed"];
+  function draw(){svg.innerHTML="";
+    if(!folded){var s=40,ox=40,oy=18;for(var r=0;r<4;r++)for(var c=0;c<4;c++){var gi=Math.floor(r/2)*2+Math.floor(c/2);svg.appendChild(el("rect",{x:ox+c*(s+6),y:oy+r*(s+6),width:s,height:s,rx:6,fill:pal[gi],opacity:.85}));}svg.appendChild(txt(ox,oy+4*(s+6)+18,12,css("--muted"),"start",css("--mono"))).textContent="16 patches (4×4) · width 768";}
+    else{var S=78,OX=120,OY=24;for(var g=0;g<4;g++){var gr=Math.floor(g/2),gc=g%2;svg.appendChild(el("rect",{x:OX+gc*(S+14),y:OY+gr*(S+14),width:S,height:S,rx:8,fill:pal[g],opacity:.9}));svg.appendChild(txt(OX+gc*(S+14)+S/2,OY+gr*(S+14)+S/2+4,11,"#fff","middle",css("--mono"))).textContent="4→1";}svg.appendChild(txt(OX,OY+2*(S+14)+16,12,css("--muted"),"start",css("--mono"))).textContent="4 tokens (2×2) · width 3072 → Linear → 576";}}
+  btn.addEventListener("click",function(){folded=!folded;btn.textContent=folded?"Unfold":"Fold ×2";hint.textContent=folded?"4 tokens · width 3072 → 576":"16 patches · width 768";draw();});
+  onView(svg,draw);draw();
+});
+
+/* ---------- PATCH GRID ---------- */
+W(function(){
+  var img=document.getElementById("patch-img"),svg=document.getElementById("patch-svg");
+  img.src=DATA.cat;
+  function draw(){svg.innerHTML="";var W0=288,H0=384,step=W0/16;
+    for(var i=0;i<=16;i++){svg.appendChild(el("line",{x1:i*step,y1:0,x2:i*step,y2:H0,stroke:"rgba(255,255,255,.35)","stroke-width":.7}));}
+    for(var j=0;j*step<=H0;j++){svg.appendChild(el("line",{x1:0,y1:j*step,x2:W0,y2:j*step,stroke:"rgba(255,255,255,.35)","stroke-width":.7}));}
+    // highlight one patch on hover
+    var hl=el("rect",{x:0,y:0,width:step,height:step,fill:"none",stroke:css("--accent"),"stroke-width":2,opacity:0});svg.appendChild(hl);
+    svg.parentNode.addEventListener("mousemove",function(e){var r=svg.getBoundingClientRect(),cx=(e.clientX-r.left)/r.width*W0,cy=(e.clientY-r.top)/r.height*H0;hl.setAttribute("x",Math.floor(cx/step)*step);hl.setAttribute("y",Math.floor(cy/step)*step);hl.setAttribute("opacity",1);});
+    svg.parentNode.addEventListener("mouseleave",function(){hl.setAttribute("opacity",0);});
+  }
+  if(img.complete)draw(); else img.addEventListener("load",draw);
+});
+
+/* ---------- RESOLUTION → TOKENS ---------- */
+W(function(){
+  var range=document.getElementById("res-range"),val=document.getElementById("res-val"),out=document.getElementById("res-out");
+  function stat(k,v,acc){return '<div class="stat'+(acc?' accent':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';}
+  function draw(){var side=+range.value;val.textContent=side;
+    var patches=Math.pow(Math.floor(side/16),2),tokens=Math.round(patches/4);
+    var cost=(tokens*tokens/ (64*64)); // relative to 64-token baseline
+    out.innerHTML=stat("patches",patches)+stat("image tokens",tokens,true)+stat("attn cost","×"+cost.toFixed(1));}
+  range.addEventListener("input",draw);draw();
+});
+
+/* ---------- OVERFIT / CURVES ---------- */
+W(function(){var s=[[0,2.1092],[1,1.4680],[2,3.1898],[3,0.7628],[4,0.4362],[5,0.2744],[6,0.1170],[7,0.0179]];
+  var svg=document.getElementById("overfit-svg");onView(svg,function(){lineChart(svg,[{pts:s,color:"--accent",label:"loss"}],{ymin:0,ymax:3.3,grid:[0,1,2,3],fmt:function(g){return g.toFixed(0);}});});});
+W(function(){var svg=document.getElementById("sftloss-svg");onView(svg,function(){lineChart(svg,[{pts:DATA.curves.sft,color:"--good"}],{ymin:0,ymax:0.25,grid:[0,0.1,0.2],fmt:function(g){return g.toFixed(2);}});});});
+W(function(){var svg=document.getElementById("sftlr-svg");onView(svg,function(){lineChart(svg,[{pts:DATA.curves.sft_lr,color:"--accent"}],{grid:null,fmt:function(g){return (g*1e4).toFixed(1)+"e-4";}});});});
+W(function(){var svg=document.getElementById("gkdloss-svg");onView(svg,function(){lineChart(svg,[{pts:DATA.curves.gkd,color:"--accent"}],{ymin:0,fmt:function(g){return g.toFixed(3);}});});});
+W(function(){var svg=document.getElementById("sdftloss-svg");onView(svg,function(){lineChart(svg,[{pts:DATA.curves.sdft,color:"--img"}],{ymin:0,fmt:function(g){return g.toFixed(3);}});});});
+function smooth(pts,w){w=w||6;return pts.map(function(p,i){var a=Math.max(0,i-w),s=0,n=0;for(var j=a;j<=i;j++){s+=pts[j][1];n++;}return [p[0],s/n];});}
+W(function(){var svg=document.getElementById("grpocurve-svg");onView(svg,function(){
+  lineChart(svg,[
+    {pts:smooth(DATA.curves.grpo,3),color:"--good",dot:false},
+    {pts:smooth(DATA.curves.grpo_zero_std_frac,7),color:"--bad",dash:"5 4",dot:false}
+  ],{ymin:0,ymax:1.02,grid:[0,0.5,1],fmt:function(g){return g.toFixed(1);}});});});
+
+/* ---------- LoRA ---------- */
+W(function(){
+  var range=document.getElementById("lora-range"),val=document.getElementById("lora-val"),out=document.getElementById("lora-out");
+  var d=2560,layers=36,nProj=7,base=4.0e9; // Qwen3.5-4B-ish target dim + layers
+  function stat(k,v,acc){return '<div class="stat'+(acc?' accent':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';}
+  function draw(){var r=+range.value;val.textContent=r;
+    var params=2*r*d*nProj*layers; var pct=params/base*100;
+    out.innerHTML=stat("B·A shape","d×"+r+" · "+r+"×k")+stat("trainable",(params/1e6).toFixed(1)+" M",true)+stat("of base",pct.toFixed(2)+"%");}
+  range.addEventListener("input",draw);draw();
+});
+
+/* ---------- MASK WIDGETS ---------- */
+function maskWidget(rowId,btnId,seq){var row=document.getElementById(rowId),btn=document.getElementById(btnId),on=true;
+  function draw(){row.innerHTML="";seq.forEach(function(tk){var d=document.createElement("div");d.textContent=tk.t;d.className="tok "+(tk.r==="img"?"img":tk.r==="ans"?(on?"sup":"msk"):"msk");row.appendChild(d);});}
+  btn.addEventListener("click",function(){on=!on;btn.classList.toggle("on",on);btn.setAttribute("aria-pressed",on);btn.textContent=on?"Show supervised tokens":"Hide highlight";draw();});draw();}
+W(function(){maskWidget("mask1-row","mask1-toggle",[{t:"<image>×64",r:"img"},{t:"What",r:"p"},{t:"is",r:"p"},{t:"in",r:"p"},{t:"the",r:"p"},{t:"image",r:"p"},{t:"?",r:"p"},{t:"A",r:"ans"},{t:"cat",r:"ans"},{t:"sitting",r:"ans"},{t:"on",r:"ans"},{t:"a",r:"ans"},{t:"mat",r:"ans"},{t:".",r:"ans"}]);});
+W(function(){maskWidget("mask2-row","mask2-toggle",[{t:"<image>×475",r:"img"},{t:"Extract",r:"p"},{t:"the",r:"p"},{t:"fields",r:"p"},{t:"…schema…",r:"p"},{t:"{",r:"ans"},{t:'"company"',r:"ans"},{t:":",r:"ans"},{t:'"BOOK TA.K"',r:"ans"},{t:",",r:"ans"},{t:'"total"',r:"ans"},{t:":",r:"ans"},{t:'"9.00"',r:"ans"},{t:"}",r:"ans"}]);});
+
+/* ---------- RECEIPT + DIFF ---------- */
+W(function(){
+  document.getElementById("receipt-img").src=DATA.receipt;
+  var t=DATA.receiptTarget;
+  document.getElementById("receipt-cap").innerHTML="SROIE receipt. The gold target is four flat fields: <code>company</code>, <code>date</code>, <code>address</code>, <code>total</code> — here <b>"+(t.total||"")+"</b> from <b>"+((t.company||"").slice(0,22))+"…</b>. CORD receipts add nested line-items.";
+});
+W(function(){
+  var gold=DATA.receiptTarget,base=DATA.baseOut;
+  function fmt(o,ref){var keys=["company","date","address","total"];return "{\n"+keys.map(function(k){var v=o[k]||"",ok=String(v).trim()===String(ref[k]||"").trim();var cls=ref?(ok?"diffok":"diffwrong"):"";return '  "'+k+'": '+(ref?'<span class="'+cls+'">"'+v+'"</span>':'"'+v+'"');}).join(",\n")+"\n}";}
+  document.getElementById("diff-base").innerHTML=fmt(base,gold);
+  document.getElementById("diff-sft").innerHTML=fmt(gold,gold);
+});
+
+/* ---------- REWARD CALCULATOR ---------- */
+W(function(){
+  var WSr=/\s+/g,NUM=/^-?\d+(?:\.\d+)?$/;
+  function nv(v){var s=String(v).trim().toLowerCase();s=s.split(",").join("").split("$").join("").split("rp").join("");s=s.replace(WSr," ").trim();if(NUM.test(s)){var f=parseFloat(s);return f===Math.trunc(f)?String(Math.trunc(f)):String(f);}return s;}
+  function flat(o,pre,out){if(o===null||o===undefined)return;if(Array.isArray(o))o.forEach(function(x){flat(x,pre,out);});else if(typeof o==="object")Object.keys(o).forEach(function(k){flat(o[k],pre?pre+"."+k:k,out);});else{var x=nv(o);if(x==="")return;out.push([pre,x]);}}
+  function ctr(a){var m=new Map();a.forEach(function(p){var k=JSON.stringify(p);m.set(k,(m.get(k)||0)+1);});return m;}
+  function sc(m){var s=0;m.forEach(function(v){s+=v;});return s;}
+  function inter(a,b){var s=0;a.forEach(function(v,k){if(b.has(k))s+=Math.min(v,b.get(k));});return s;}
+  function f1(p,g){var tp=inter(p,g),sp=sc(p),sg=sc(g),pr=sp?tp/sp:(sg?0:1),rc=sg?tp/sg:1;return (pr+rc)?2*pr*rc/(pr+rc):0;}
+  function score(pred,gold){var pp=[],gp=[];flat(pred,"",pp);flat(gold,"",gp);var pP=ctr(pp),gP=ctr(gp),pK=ctr(pp.map(function(x){return[x[0]];})),gK=ctr(gp.map(function(x){return[x[0]];}));var ko=inter(pK,gK),po=inter(pP,gP);return{field_f1:f1(pK,gK),value_acc:ko?po/ko:(sc(gK)?0:1)};}
+  var gold=DATA.receiptTarget;
+  var pres={perfect:JSON.stringify(gold,null,2),partial:JSON.stringify({company:(gold.company||"").toLowerCase(),total:(gold.total||"").replace(/0$/,"")},null,2),wrong:JSON.stringify({company:gold.company,date:"01/01/2019",address:"WRONG ST",total:"99.00"},null,2),garbage:"This looks like a receipt, total about 9 dollars."};
+  var goldEl=document.getElementById("rw-gold"),predEl=document.getElementById("rw-pred"),pe=document.getElementById("rw-parse"),fe=document.getElementById("rw-field"),ve=document.getElementById("rw-value"),te=document.getElementById("rw-total"),bar=document.getElementById("rw-bar");
+  goldEl.value=JSON.stringify(gold,null,2);
+  function drawBar(v){bar.innerHTML="";bar.appendChild(el("rect",{x:0,y:9,width:520,height:12,rx:6,fill:css("--panel-2")}));bar.appendChild(el("rect",{x:0,y:9,width:Math.max(4,520*v),height:12,rx:6,fill:v>=.85?css("--good"):v>=.4?css("--accent"):css("--bad")}));}
+  function upd(){var pred=null,ok=false;try{pred=JSON.parse(predEl.value);ok=pred&&typeof pred==="object";}catch(e){ok=false;}
+    if(!ok){pe.textContent="0";pe.style.color=css("--bad");fe.textContent="0.00";ve.textContent="0.00";te.textContent="0.000";te.style.color=css("--bad");drawBar(0);return;}
+    var m=score(pred,gold),rw=0.3+0.5*m.field_f1+0.2*m.value_acc;pe.textContent="1";pe.style.color=css("--good");fe.textContent=m.field_f1.toFixed(2);ve.textContent=m.value_acc.toFixed(2);te.textContent=rw.toFixed(3);te.style.color=css("--accent-ink");drawBar(rw);}
+  predEl.addEventListener("input",upd);
+  [].forEach.call(document.querySelectorAll("[data-preset]"),function(b){b.addEventListener("click",function(){predEl.value=pres[b.dataset.preset];upd();});});
+  predEl.value=pres.partial;upd();
+});
+
+/* ---------- GRPO ROLLOUT ---------- */
+W(function(){
+  var range=document.getElementById("rollout-range"),val=document.getElementById("rollout-val"),svg=document.getElementById("rollout-svg"),resamp=document.getElementById("rollout-resample");
+  var meanEl=document.getElementById("rollout-mean"),stdEl=document.getElementById("rollout-std"),gradEl=document.getElementById("rollout-grad"),noise=[];
+  function reroll(){noise=[];for(var i=0;i<8;i++)noise.push(Math.random());}
+  reroll();
+  function draw(){
+    var q=+range.value/100; val.textContent=(+range.value)+"%";
+    // higher quality -> rewards bunch near 1, less spread
+    var spread=0.55*(1-q)+0.02, base=0.35+0.62*q;
+    var rs=noise.map(function(z){return Math.max(0,Math.min(1,base+spread*(z-0.5)));});
+    var mean=rs.reduce(function(a,b){return a+b;},0)/8;
+    var std=Math.sqrt(rs.reduce(function(a,b){return a+(b-mean)*(b-mean);},0)/8);
+    svg.innerHTML="";var x0=44,bw=48,gap=10,y0=12,H=140;
+    rs.forEach(function(r,i){
+      var adv=std>0.03?(r-mean)/std:0;  // near-zero std -> group is masked (real GRPO), no usable advantage
+      var col=adv>0.15?css("--good"):adv<-0.15?css("--bad"):css("--muted");
+      var h=Math.max(2,H*r),x=x0+i*(bw+gap);
+      svg.appendChild(el("rect",{x:x,y:y0+H-h,width:bw,height:h,rx:4,fill:col,opacity:.9}));
+      svg.appendChild(txt(x+bw/2,y0+H-h-4,10,css("--ink-2"),"middle",css("--sans"))).textContent=r.toFixed(2);
+      svg.appendChild(txt(x+bw/2,y0+H+14,10.5,col,"middle",css("--sans"),"640")).textContent=(adv>=0?"+":"")+adv.toFixed(1);
+    });
+    // mean line
+    svg.appendChild(el("line",{x1:x0-6,y1:y0+H-H*mean,x2:x0+8*(bw+gap)-gap+6,y2:y0+H-H*mean,stroke:css("--accent"),"stroke-width":1.4,"stroke-dasharray":"4 3"}));
+    svg.appendChild(txt(x0-8,y0+H+14,10,css("--muted"),"end",css("--sans"))).textContent="adv:";
+    meanEl.textContent=mean.toFixed(2);stdEl.textContent=std.toFixed(3);
+    var usable=std>0.05; gradEl.textContent=usable?"yes":"~0"; gradEl.style.color=usable?css("--good"):css("--bad");
+  }
+  range.addEventListener("input",draw);resamp.addEventListener("click",function(){reroll();draw();});onView(svg,draw);draw();
+});
+
+/* ---------- BETA MORPH ---------- */
+W(function(){
+  var range=document.getElementById("beta-range"),val=document.getElementById("beta-val"),cv=document.getElementById("beta-canvas"),cap=document.getElementById("beta-cap");
+  function gauss(x,m,s){return Math.exp(-(x-m)*(x-m)/(2*s*s));}
+  function draw(){
+    var beta=+range.value/100;val.textContent=beta.toFixed(2);
+    var ctx=cv.getContext("2d"),Wc=cv.width,Hc=cv.height;ctx.clearRect(0,0,Wc,Hc);
+    var N=Wc,teacher=[],student=[];
+    for(var i=0;i<N;i++){var x=i/N*10;
+      var t=gauss(x,3,0.6)+0.85*gauss(x,7,0.6); teacher.push(t);
+      // beta=0 mode-seeking: narrow peak on tallest mode; beta=1 mode-covering: broad, both modes
+      var seek=gauss(x,3,0.55);
+      var cover=0.85*(gauss(x,3,0.9)+0.85*gauss(x,7,0.9));
+      student.push(seek*(1-beta)+cover*beta);}
+    function norm(a){var mx=Math.max.apply(0,a);return a.map(function(v){return v/mx;});}
+    teacher=norm(teacher);student=norm(student);
+    function area(arr,color,alpha){ctx.beginPath();ctx.moveTo(0,Hc);for(var i=0;i<N;i++)ctx.lineTo(i,Hc-arr[i]*(Hc-24)-8);ctx.lineTo(N,Hc);ctx.closePath();ctx.fillStyle=color;ctx.globalAlpha=alpha;ctx.fill();ctx.globalAlpha=1;}
+    var dark=curTheme()==="dark";
+    area(teacher,dark?"#8b93a1":"#9aa2b1",0.35);
+    area(student,dark?"#8b83ff":"#4f46e5",0.5);
+    ctx.font="12px "+css("--sans");ctx.fillStyle=css("--muted");ctx.fillText("teacher (2 modes)",10,16);
+    ctx.fillStyle=css("--accent-ink");ctx.fillText("student",10,32);
+    cap.innerHTML=beta<0.34?"<b>Mode-seeking</b> (β→0): the student commits to a single mode and ignores the other.":beta>0.66?"<b>Mode-covering</b> (β→1): the student spreads to cover both of the teacher's modes.":"<b>Symmetric JSD</b> (β=0.5): a balance — the default for GKD here.";
+  }
+  range.addEventListener("input",draw);onView(cv,draw);draw();
+  new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+});
+
+/* ---------- SDFT PROMPT DIFF ---------- */
+W(function(){var btn=document.getElementById("pd-toggle"),demo=document.getElementById("pd-demo"),shown=false;
+  btn.addEventListener("click",function(){shown=!shown;demo.classList.toggle("hidden",!shown);btn.textContent=shown?"Hide the demonstration":"Reveal what only the teacher sees";});});
+
+/* ---------- COMPARISON CHART ---------- */
+W(function(){
+  var svg=document.getElementById("chart-svg");
+  var data=[{l:"4B base",v:0.795,c:"--muted"},{l:"4B SFT",v:0.900,c:"--good"},{l:"4B GRPO",v:0.893,c:"--good"},{l:"0.8B base",v:0.653,c:"--muted"},{l:"0.8B SFT",v:0.823,c:"--img"},{l:"0.8B GKD",v:0.847,c:"--accent"},{l:"0.8B SDFT",v:0.733,c:"--img"}];
+  var W0=620,H0=300,pad={l:40,r:16,t:16,b:64},iw=W0-pad.l-pad.r,ih=H0-pad.t-pad.b,gapx=iw/data.length,bw=gapx*0.62,drawn=false;
+  function Y(v){return pad.t+ih*(1-v);}
+  function draw(){svg.innerHTML="";
+    [0,0.25,0.5,0.75,1].forEach(function(g){svg.appendChild(el("line",{x1:pad.l,y1:Y(g),x2:W0-pad.r,y2:Y(g),stroke:css("--line"),"stroke-width":1}));svg.appendChild(txt(pad.l-6,Y(g)+3,10,css("--muted"),"end")).textContent=g.toFixed(2);});
+    svg.appendChild(el("line",{x1:pad.l,y1:Y(0.90),x2:W0-pad.r,y2:Y(0.90),stroke:css("--good"),"stroke-width":1.4,"stroke-dasharray":"5 4",opacity:.7}));
+    svg.appendChild(txt(W0-pad.r,Y(0.90)-5,10,css("--good"),"end")).textContent="4B teacher 0.90";
+    data.forEach(function(d,i){var bx=pad.l+i*gapx+(gapx-bw)/2,top=Y(d.v),full=ih*d.v;
+      var rect=el("rect",{x:bx,y:drawn?top:pad.t+ih,width:bw,height:drawn?full:0,rx:4,fill:css(d.c),opacity:.92});rect.style.transition="y .7s cubic-bezier(.2,.7,.2,1), height .7s cubic-bezier(.2,.7,.2,1)";svg.appendChild(rect);
+      requestAnimationFrame(function(){rect.setAttribute("y",top);rect.setAttribute("height",full);});
+      var vt=txt(bx+bw/2,top-6,11,css("--ink"),"middle",css("--sans"),"640");vt.textContent=d.v.toFixed(3);vt.style.opacity=0;vt.style.transition="opacity .5s .35s";svg.appendChild(vt);requestAnimationFrame(function(){vt.style.opacity=1;});
+      svg.appendChild(txt(bx+bw/2,H0-pad.b+16,10.5,css("--muted"),"middle")).textContent=d.l;
+      rect.addEventListener("mouseenter",function(){rect.setAttribute("opacity",1);});rect.addEventListener("mouseleave",function(){rect.setAttribute("opacity",.92);});});}
+  new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting&&!drawn){drawn=true;draw();}});},{threshold:.3}).observe(svg);draw();
+});
+
+/* ---------- BLOCK EXPLORER ---------- */
+W(function(){
+  var stack=document.getElementById("block-stack"),desc=document.getElementById("block-desc");
+  var stages=[
+    {n:"input  x",t:"residual",d:"The block input — the running <b>residual stream</b>, shape [B, T, 576]. Every sub-layer below only <em>adds</em> to it."},
+    {n:"RMSNorm",t:"norm",d:"Normalize each token vector by its root-mean-square (no mean, no bias) times a learned gain. Stabilizes the scale before attention. ~0.03% of the block."},
+    {n:"GQA + RoPE",t:"attn",d:"Grouped-query self-attention with rotary positions — each token mixes in information from the tokens it attends to. This is where positions <em>move</em> across the sequence. <b>~25%</b> of the block's parameters."},
+    {n:"⊕  add residual",t:"add",d:"x = x + attn(norm(x)). The skip connection: gradients flow straight down this path, which is why 30 stacked layers train at all."},
+    {n:"RMSNorm",t:"norm",d:"Normalize again, now before the feed-forward sub-layer."},
+    {n:"SwiGLU MLP",t:"mlp",d:"The gated feed-forward: down(SiLU(gate(x)) ⊙ up(x)). Processes each position independently, with per-channel gating. <b>~75%</b> of the block's parameters live here."},
+    {n:"⊕  add residual",t:"add",d:"x = x + mlp(norm(x)). Output is still [B, T, 576] — a same-shape refinement, ready for the next block."}
+  ];
+  function sel(i){[].forEach.call(stack.children,function(c,k){c.classList.toggle("on",k===i);});desc.innerHTML='<div class="fig-title" style="margin-bottom:.4rem">'+stages[i].n.replace(/\s+/g," ")+'</div>'+stages[i].d;}
+  stages.forEach(function(s,i){var d=document.createElement("div");d.className="blkstage "+s.t;d.textContent=s.n;d.tabIndex=0;d.addEventListener("click",function(){sel(i);});d.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();sel(i);}});stack.appendChild(d);});
+  sel(2);
+});
+
+/* ---------- PARAMETER BUDGET ---------- */
+W(function(){
+  var host=document.getElementById("budget-host");
+  function seg(rows){
+    var bar='<div class="pbar">'+rows.map(function(r){return '<div class="pseg" style="flex:'+r.v+';background:'+r.c+'"></div>';}).join("")+'</div>';
+    var leg='<div class="legend" style="margin-top:.45rem">'+rows.map(function(r){return '<span><i class="sw" style="background:'+r.c+'"></i> '+r.l+' &nbsp;<b style="color:var(--ink-2)">'+r.t+'</b></span>';}).join("")+'</div>';
+    return bar+leg;}
+  host.innerHTML=
+    '<div class="hint" style="margin-bottom:.35rem">whole model · 222M parameters</div>'+
+    seg([{l:"LM (SmolLM2)",v:134.5,t:"135M · 61%",c:"var(--accent)"},{l:"ViT (SigLIP2)",v:85.7,t:"86M · 39%",c:"var(--img)"},{l:"projector",v:1.77,t:"1.8M · 0.8%",c:"var(--good)"}])+
+    '<div class="hint" style="margin:1rem 0 .35rem">inside one decoder block · 3.5M parameters</div>'+
+    seg([{l:"SwiGLU MLP (gate, up, down)",v:75,t:"75%",c:"var(--amber)"},{l:"attention (q, k, v, o)",v:25,t:"25%",c:"var(--accent)"}]);
+});
+
+})();
+</script></body></html>
