@@ -152,19 +152,36 @@ details.deep .dbody>*:first-child{margin-top:0}
 kbd,.kbd{font-family:var(--mono);background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:.02em .38em;font-size:.82em}
 footer{margin:4rem 0 3rem;padding-top:1.6rem;border-top:1px solid var(--line);color:var(--muted);font-family:var(--sans);font-size:.85rem}
 footer a{color:var(--accent-ink)}
-#block-stack{display:flex;flex-direction:column;gap:6px;min-width:200px}
-.blkstage{font-family:var(--mono);font-size:.78rem;padding:.5rem .7rem;border-radius:8px;border:1px solid var(--line-2);background:var(--ground);cursor:pointer;text-align:center;transition:transform .12s,border-color .2s,box-shadow .2s}
-.blkstage:hover{transform:translateX(3px)}
-.blkstage.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
-.blkstage.attn{border-left:4px solid var(--accent)}
-.blkstage.mlp{border-left:4px solid var(--amber)}
-.blkstage.norm{border-left:4px solid var(--muted)}
-.blkstage.add{border-left:4px solid var(--good);color:var(--good)}
-.blkstage.residual{border-left:4px solid var(--ink-2);font-weight:640}
-#block-desc{flex:1;min-width:210px;background:var(--ground);border:1px solid var(--line);border-radius:10px;padding:.8rem .9rem;font-size:.92rem;color:var(--ink-2);align-self:flex-start}
-#block-desc .fig-title{color:var(--accent-ink)}
+#block-svg{flex:0 0 auto;max-width:100%;overflow:visible}
+#block-svg .blk-g{cursor:pointer;transition:opacity .15s}
+#block-svg .blk-g rect:first-of-type,#block-svg .blk-g circle{transition:stroke .18s,stroke-width .18s}
+#block-svg .blk-g:hover rect:first-of-type,#block-svg .blk-g:hover circle{stroke:var(--accent)}
+#block-svg .blk-g.on rect:first-of-type,#block-svg .blk-g.on circle{stroke:var(--accent);stroke-width:2.4}
+#block-svg .blk-g.on rect:first-of-type{filter:drop-shadow(0 0 4px var(--accent-soft))}
+#block-svg text{-webkit-user-select:none;user-select:none}
+#block-desc{flex:1;min-width:230px;background:var(--ground);border:1px solid var(--line);border-radius:10px;padding:.85rem .95rem;font-size:.9rem;color:var(--ink-2);align-self:flex-start}
+.bd-title{font-family:var(--mono);color:var(--accent-ink);font-size:.88rem;margin-bottom:.55rem}
+.bd-row{display:flex;justify-content:space-between;gap:1rem;font-family:var(--mono);font-size:.76rem;border-top:1px solid var(--line);padding:.32rem 0}
+.bd-row span{color:var(--muted)}
+.bd-row b{color:var(--ink);text-align:right}
+#block-desc p{margin:.65rem 0 0;line-height:1.55}
 .pbar{display:flex;height:30px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
 .pseg{min-width:2px;transition:flex .5s ease}
+#pipe{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-start;margin-top:.7rem}
+#pipe-list{display:flex;flex-direction:column;gap:5px;flex:0 0 auto;min-width:186px}
+.pstage{font-family:var(--mono);font-size:.72rem;border:1px solid var(--line-2);border-left:4px solid var(--line-2);background:var(--ground);border-radius:8px;padding:.4rem .55rem;cursor:pointer;display:flex;flex-direction:column;gap:2px;transition:border-color .15s,box-shadow .15s}
+.pstage .pn{color:var(--ink)}
+.pstage .psh{color:var(--muted);font-size:.66rem}
+.pstage:hover{border-color:var(--accent)}
+.pstage.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.pstage.input{border-left-color:var(--ink-2)}
+.pstage.patch,.pstage.vit{border-left-color:var(--img)}
+.pstage.proj,.pstage.splice{border-left-color:var(--accent)}
+.pstage.decode{border-left-color:var(--amber)}
+.pstage.predict{border-left-color:var(--good)}
+#pipe-canvas{flex:0 0 auto;border:1px solid var(--line);border-radius:10px;background:var(--panel);max-width:100%}
+#pipe-desc{flex:1;min-width:200px;background:var(--ground);border:1px solid var(--line);border-radius:10px;padding:.8rem .9rem;font-size:.88rem;color:var(--ink-2);align-self:stretch}
+#pipe-desc p{margin:.6rem 0 0;line-height:1.55}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}html.js .reveal{opacity:1;transform:none}}
 </style></head><body><div class="topbar"><div class="wrap">
   <span class="brand">nano<span class="dot">·</span>VLM &nbsp;workshop</span>
@@ -251,13 +268,63 @@ code runs — hover, drag, and press things.</p>
   <aside class="mn"><span class="mn-num">§2</span>The static config ships placeholder dims (960 / 15
   heads / 32 layers). <code>from_pretrained</code> overwrites them to the real SmolLM2-135M:
   <b>576 / 9 heads / 30 layers</b>. The checkpoint is the source of truth for shape.</aside>
-  <p>The backbone is a modern (Llama-style) decoder: RMSNorm, rotary positions, grouped-query attention,
-  a gated MLP, and a tied head. The engine of every block is <strong>self-attention</strong>:</p>
+  <p>The backbone is a modern (Llama-style) decoder: <strong>RMSNorm</strong>, <strong>rotary positions</strong>,
+  <strong>grouped-query attention</strong>, a <strong>gated MLP</strong>, and a <strong>tied head</strong>.
+  Thirty identical <em>blocks</em> stacked on a residual stream do all the work — so we look at the block
+  whole first, then open each piece.</p>
+
+  <h3 id="s2block">The block, assembled</h3>
+  <aside class="mn"><span class="mn-num">§2</span>Every sub-layer reads from and writes back to a shared
+  <em>residual stream</em>. Because each only <em>adds</em> to it, gradients flow straight down the skip
+  path — the reason a 30-layer transformer trains at all.</aside>
+  <p>A block is two <strong>pre-norm residual</strong> sub-layers — normalize, transform, add back — wrapped
+  around the two operations we unpack in this section: <strong>attention</strong>, which mixes information
+  <em>across</em> token positions, and a <strong>gated MLP</strong>, which processes each token <em>on its own</em>.</p>
+  <pre>res = x;  x = res + <span class="k">attn</span>(<span class="k">rmsnorm</span>(x), cos, sin, mask)   <span class="c"># attention sub-layer — mixes across positions</span>
+res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x))                    <span class="c"># feed-forward sub-layer — per position</span></pre>
+  <p>The feed-forward is a <strong>gated MLP (SwiGLU)</strong>: two parallel projections up to a wider
+  dimension, one passed through a SiLU gate, multiplied elementwise, then projected back down:</p>
+  <math display="block"><mrow><mi>SwiGLU</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>W</mi><mi>down</mi></msub><mo>(</mo><mi>SiLU</mi><mo>(</mo><msub><mi>W</mi><mi>gate</mi></msub><mi>x</mi><mo>)</mo><mo>⊙</mo><msub><mi>W</mi><mi>up</mi></msub><mi>x</mi><mo>)</mo></mrow></math>
+  <p>The gate lets the network modulate its own signal per-channel — and this MLP is where <em>most</em> of a
+  block's parameters live (the budget in §6). Click a stage, or play a token through the block:</p>
+  <figure class="fig reveal" id="fig-block">
+    <div class="fig-title">transformer block · data-flow</div>
+    <div class="controls"><button class="btn pri" id="block-play">▶ animate a token through</button><span class="hint">click any stage — its shape change &amp; parameter count appear at right</span></div>
+    <div style="display:flex;gap:1.1rem;flex-wrap:wrap;align-items:flex-start;margin-top:.6rem">
+      <svg id="block-svg" width="340" height="470" viewBox="0 0 340 470" role="img" aria-label="transformer block data flow"></svg>
+      <div id="block-desc"></div>
+    </div>
+    <figcaption>The vertical rail is the <b>residual stream</b>; every stage is <b>[B, T, 576]</b> in and out.
+    The two dashed <b>skip arcs</b> carry the unchanged input around each sub-layer — the path gradients take
+    from layer 30 back to layer 1. Stack 30 blocks and you have the decoder.</figcaption>
+  </figure>
+  <details class="deep"><summary>Go deeper: the residual stream as a communication channel</summary><div class="dbody">
+    <p>A useful mental model: the residual stream is a shared bus of width 576 that every layer reads from and
+    writes to. Attention <em>moves</em> information between token positions; the MLP <em>processes</em> it
+    within a position. Because writes are additive, later layers can read what earlier layers deposited, and a
+    sub-layer that has nothing to add can output ~0 and leave the stream unchanged. Pre-norm (normalizing the
+    <em>input</em> to each sub-layer, not its output) keeps the stream's scale from exploding across depth,
+    which is what makes very deep stacks trainable without careful warmup tricks.</p>
+  </div></details>
+  <details class="deep"><summary>Go deeper: embeddings, weight tying &amp; the extended vocabulary</summary><div class="dbody">
+    <p>The first and last layers are a matched pair. The <b>token embedding</b> is a lookup table
+    <math><mrow><mo>[</mo><mi>vocab</mi><mo>×</mo><mn>576</mn><mo>]</mo></mrow></math> turning ids into vectors;
+    the <b>head</b> projects the final hidden state back to <math><mrow><mo>[</mo><mn>576</mn><mo>×</mo><mi>vocab</mi><mo>]</mo></mrow></math>
+    logits. nanoVLM <em>ties</em> them — <code>head.weight = token_embedding.weight</code> — halving those
+    28M parameters and coupling "how a token looks going in" with "how it's scored coming out".</p>
+    <p>To host images, the VLM grafts <b>66 new tokens</b> onto SmolLM2's <b>49,152</b>-token vocabulary
+    (the <code>&lt;image&gt;</code> placeholder plus tile markers), giving <b>49,218</b>. The pretrained rows
+    are copied in; the 66 new rows are freshly initialized and learned during training. The embedding matrix
+    is the one place the "language" model gains genuinely new, vision-specific vocabulary.</p>
+  </div></details>
+
+  <h3>Self-attention</h3>
+  <p>Now the attention sub-layer we deferred. Each token forms a query <math><mi>Q</mi></math>; it scores every
+  token it may attend to via a dot product with their keys <math><mi>K</mi></math>, softmaxes those scores into
+  weights, and mixes their values <math><mi>V</mi></math>:</p>
   <math display="block"><mrow><mi>Attention</mi><mo>(</mo><mi>Q</mi><mo>,</mo><mi>K</mi><mo>,</mo><mi>V</mi><mo>)</mo><mo>=</mo><mi>softmax</mi><mo>(</mo><mfrac><mrow><mi>Q</mi><msup><mi>K</mi><mi>⊤</mi></msup></mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mfrac><mo>)</mo><mspace width="0.15em"/><mi>V</mi></mrow></math>
-  <p>Each token forms a query <math><mi>Q</mi></math>; it scores every token it may attend to via a dot
-  product with their keys <math><mi>K</mi></math>, softmaxes those scores into weights, and mixes their
-  values <math><mi>V</mi></math>. In the <em>decoder</em> a causal mask forbids looking right; in the
-  <em>ViT</em> (Part I §3) there's no mask — vision is bidirectional. See it:</p>
+  <p>In the <em>decoder</em> a causal mask forbids looking right; in the <em>ViT</em> (Part I §3) there's no
+  mask — vision is bidirectional. See it:</p>
   <figure class="fig reveal" id="fig-attn">
     <div class="fig-title">attention · who attends to whom</div>
     <div class="controls">
@@ -306,6 +373,21 @@ code runs — hover, drag, and press things.</p>
     <svg id="gqa-svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="grouped query attention"></svg>
   </figure>
 
+  <h3>The KV-cache</h3>
+  <p>Generating one token at a time, you don't re-attend over the whole prefix each step. The cache stores
+  past keys/values so a new token computes only its own K/V and attends against the stored ones.</p>
+  <figure class="fig reveal" id="fig-kv">
+    <div class="fig-title">kv-cache · constant work per new token</div>
+    <div class="controls">
+      <button class="btn" id="kv-prefill">Prefill 4 tokens</button>
+      <button class="btn pri" id="kv-add">+ generate 1</button>
+      <button class="btn" id="kv-reset">reset</button>
+    </div>
+    <svg id="kv-svg" width="520" height="92" viewBox="0 0 520 92" role="img" aria-label="growing kv cache"></svg>
+    <figcaption id="kv-cap">Cache empty. Prefill runs the prompt once; each generated token then appends a
+    single column and reads the rest — <b>O(1)</b> new compute per step instead of O(T).</figcaption>
+  </figure>
+
   <h3 id="s25">The attention-variants landscape</h3>
   <p>GQA is one point on a spectrum that trades KV-cache size against expressiveness. The cache is what you
   must store per token to avoid recomputation (§2 KV-cache); shrinking it is the difference between a model
@@ -344,62 +426,6 @@ code runs — hover, drag, and press things.</p>
     outputs are identical.</p>
   </div></details>
 
-  <h3>The KV-cache</h3>
-  <p>Generating one token at a time, you don't re-attend over the whole prefix each step. The cache stores
-  past keys/values so a new token computes only its own K/V and attends against the stored ones.</p>
-  <figure class="fig reveal" id="fig-kv">
-    <div class="fig-title">kv-cache · constant work per new token</div>
-    <div class="controls">
-      <button class="btn" id="kv-prefill">Prefill 4 tokens</button>
-      <button class="btn pri" id="kv-add">+ generate 1</button>
-      <button class="btn" id="kv-reset">reset</button>
-    </div>
-    <svg id="kv-svg" width="520" height="92" viewBox="0 0 520 92" role="img" aria-label="growing kv cache"></svg>
-    <figcaption id="kv-cap">Cache empty. Prefill runs the prompt once; each generated token then appends a
-    single column and reads the rest — <b>O(1)</b> new compute per step instead of O(T).</figcaption>
-  </figure>
-
-  <h3 id="s2block">The block, assembled</h3>
-  <aside class="mn"><span class="mn-num">§2</span>Every sub-layer reads from and writes back to a shared
-  <em>residual stream</em>. Because each only <em>adds</em> to it, gradients flow straight down the skip
-  path — the reason a 30-layer transformer trains at all.</aside>
-  <p>Attention is only half a block. The full unit — repeated 30 times — is two <strong>pre-norm residual</strong>
-  sub-layers: normalize, transform, add back.</p>
-  <pre>res = x;  x = res + <span class="k">attn</span>(<span class="k">rmsnorm</span>(x), cos, sin, mask)   <span class="c"># attention sub-layer</span>
-res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x))                    <span class="c"># feed-forward sub-layer</span></pre>
-  <p>The second sub-layer is a <strong>gated MLP (SwiGLU)</strong>: two parallel projections up to a wider
-  dimension, one passed through a SiLU gate, multiplied elementwise, then projected back down:</p>
-  <math display="block"><mrow><mi>SwiGLU</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>W</mi><mi>down</mi></msub><mo>(</mo><mi>SiLU</mi><mo>(</mo><msub><mi>W</mi><mi>gate</mi></msub><mi>x</mi><mo>)</mo><mo>⊙</mo><msub><mi>W</mi><mi>up</mi></msub><mi>x</mi><mo>)</mo></mrow></math>
-  <p>The gate lets the network modulate its own signal per-channel — and this MLP is where <em>most</em> of a
-  block's parameters live (see the budget in §6). Click through a block:</p>
-  <figure class="fig reveal" id="fig-block">
-    <div class="fig-title">transformer block · click a stage</div>
-    <div style="display:flex;gap:1rem;flex-wrap:wrap">
-      <div id="block-stack"></div>
-      <div id="block-desc"></div>
-    </div>
-    <figcaption>Shape is <b>[B, T, 576]</b> in and out — every block is a same-shape refinement of the
-    residual stream. Stack 30 and you have the decoder.</figcaption>
-  </figure>
-  <details class="deep"><summary>Go deeper: the residual stream as a communication channel</summary><div class="dbody">
-    <p>A useful mental model: the residual stream is a shared bus of width 576 that every layer reads from and
-    writes to. Attention <em>moves</em> information between token positions; the MLP <em>processes</em> it
-    within a position. Because writes are additive, later layers can read what earlier layers deposited, and a
-    sub-layer that has nothing to add can output ~0 and leave the stream unchanged. Pre-norm (normalizing the
-    <em>input</em> to each sub-layer, not its output) keeps the stream's scale from exploding across depth,
-    which is what makes very deep stacks trainable without careful warmup tricks.</p>
-  </div></details>
-  <details class="deep"><summary>Go deeper: embeddings, weight tying &amp; the extended vocabulary</summary><div class="dbody">
-    <p>The first and last layers are a matched pair. The <b>token embedding</b> is a lookup table
-    <math><mrow><mo>[</mo><mi>vocab</mi><mo>×</mo><mn>576</mn><mo>]</mo></mrow></math> turning ids into vectors;
-    the <b>head</b> projects the final hidden state back to <math><mrow><mo>[</mo><mn>576</mn><mo>×</mo><mi>vocab</mi><mo>]</mo></mrow></math>
-    logits. nanoVLM <em>ties</em> them — <code>head.weight = token_embedding.weight</code> — halving those
-    28M parameters and coupling "how a token looks going in" with "how it's scored coming out".</p>
-    <p>To host images, the VLM grafts <b>66 new tokens</b> onto SmolLM2's <b>49,152</b>-token vocabulary
-    (the <code>&lt;image&gt;</code> placeholder plus tile markers), giving <b>49,218</b>. The pretrained rows
-    are copied in; the 66 new rows are freshly initialized and learned during training. The embedding matrix
-    is the one place the "language" model gains genuinely new, vision-specific vocabulary.</p>
-  </div></details>
 </section>
 
 <section class="section" id="s3">
@@ -527,8 +553,28 @@ labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never tr
 <section class="section" id="s6">
   <div class="snum">Section 6</div>
   <h2>Assemble &amp; run the forward pass</h2>
-  <p>Now everything converges: text rows from the embedding, image rows from ViT+projector, the splice, the
-  decoder+head, and a masked cross-entropy over the answer tokens only:</p>
+  <p>Now everything converges. Before the loss, watch the <em>whole</em> model run once — an image and a prompt
+  in, a predicted token out. Each stage is a piece you have already met: patchify and the ViT (§3), the
+  pixel-shuffle projector (§5), the splice (§1), and thirty of the block you assembled (§2). Press play, or
+  click any stage to freeze it and read its shape:</p>
+  <figure class="fig reveal" id="fig-pipe">
+    <div class="fig-title">the whole VLM · one forward pass</div>
+    <div class="controls">
+      <button class="btn pri" id="pipe-play">▶ run the forward pass</button>
+      <button class="btn" id="pipe-step">step ▸</button>
+      <div class="seg" id="pipe-img" role="group" aria-label="sample image"><button class="on" data-img="receipt">receipt</button><button data-img="cat">cat</button></div>
+      <span class="hint">left: stages · center: what the tensor looks like · right: detail</span>
+    </div>
+    <div id="pipe">
+      <div id="pipe-list" role="listbox" aria-label="pipeline stages"></div>
+      <canvas id="pipe-canvas" width="600" height="480" role="img" aria-label="forward-pass stage visualization"></canvas>
+      <div id="pipe-desc"></div>
+    </div>
+    <figcaption>The shape ribbon is the whole story: <b>[3, 256, 256]</b> pixels → <b>256 × 768</b> patch
+    embeddings → <b>64 × 576</b> image tokens → one <b>[T, 576]</b> sequence → <b>49,218</b> logits → a token.
+    The projector is the only genuinely new part; everything else is the ViT and the decoder block reused.</figcaption>
+  </figure>
+  <p>Then, the training signal: a masked cross-entropy over the answer tokens only —</p>
   <math display="block"><mrow><mi>ℒ</mi><mo>=</mo><mo>−</mo><mfrac><mn>1</mn><mrow><mo>|</mo><mi>𝒮</mi><mo>|</mo></mrow></mfrac><munder><mo>∑</mo><mrow><mi>t</mi><mo>∈</mo><mi>𝒮</mi></mrow></munder><mi>log</mi><mspace width="0.15em"/><msub><mi>p</mi><mi>θ</mi></msub><mo>(</mo><msub><mi>y</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>x</mi><mrow><mo>&lt;</mo><mi>t</mi></mrow></msub><mo>)</mo></mrow></math>
   <p>where <math><mi>𝒮</mi></math> is the set of supervised (non-<code>-100</code>) positions. On an
   untrained projector the loss is finite (≈ the log-vocab baseline), not <code>nan</code> — the pipeline
@@ -1273,20 +1319,69 @@ W(function(){
   new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting&&!drawn){drawn=true;draw();}});},{threshold:.3}).observe(svg);draw();
 });
 
-/* ---------- BLOCK EXPLORER ---------- */
+/* ---------- BLOCK DIAGRAM (data-flow) ---------- */
 W(function(){
-  var stack=document.getElementById("block-stack"),desc=document.getElementById("block-desc");
-  var stages=[
-    {n:"input  x",t:"residual",d:"The block input — the running <b>residual stream</b>, shape [B, T, 576]. Every sub-layer below only <em>adds</em> to it."},
-    {n:"RMSNorm",t:"norm",d:"Normalize each token vector by its root-mean-square (no mean, no bias) times a learned gain. Stabilizes the scale before attention. ~0.03% of the block."},
-    {n:"GQA + RoPE",t:"attn",d:"Grouped-query self-attention with rotary positions — each token mixes in information from the tokens it attends to. This is where positions <em>move</em> across the sequence. <b>~25%</b> of the block's parameters."},
-    {n:"⊕  add residual",t:"add",d:"x = x + attn(norm(x)). The skip connection: gradients flow straight down this path, which is why 30 stacked layers train at all."},
-    {n:"RMSNorm",t:"norm",d:"Normalize again, now before the feed-forward sub-layer."},
-    {n:"SwiGLU MLP",t:"mlp",d:"The gated feed-forward: down(SiLU(gate(x)) ⊙ up(x)). Processes each position independently, with per-channel gating. <b>~75%</b> of the block's parameters live here."},
-    {n:"⊕  add residual",t:"add",d:"x = x + mlp(norm(x)). Output is still [B, T, 576] — a same-shape refinement, ready for the next block."}
+  var svg=document.getElementById("block-svg"),desc=document.getElementById("block-desc"),play=document.getElementById("block-play");
+  if(!svg||!desc) return;
+  var cx=150,bw=170,bx=cx-bw/2,bh=34;
+  var S=[
+    {y:26,n:"x · input",t:"residual",shp:"[B, T, 576]",pr:"—",
+      d:"The block input: the running <b>residual stream</b>, shape [B,&nbsp;T,&nbsp;576]. Every sub-layer below only <em>adds</em> to it, so it acts as a shared bus that all 30 layers read from and write to."},
+    {y:92,n:"RMSNorm",t:"norm",shp:"576 → 576",pr:"576 · 0.02%",
+      d:"Scale each token vector by its root-mean-square (no mean-subtraction, no bias) times a learned per-channel gain. This is <b>pre-norm</b> — it normalizes the <em>input</em> to the sub-layer, holding the stream's scale bounded as depth grows."},
+    {y:158,n:"attention · GQA + RoPE",t:"attn",shp:"576 → q 576 · k,v 192 → 576",pr:"884,736 · 25%",
+      d:"The attention sub-layer. 9 query heads (64-dim each) served by 3 key/value heads — that's the 576 vs 192 asymmetry of GQA — with rotary positions on q and k. The <em>only</em> place information moves <b>across</b> token positions. Weights: q, k, v, o projections."},
+    {y:224,n:"⊕",t:"add",shp:"576 + 576 → 576",pr:"0",
+      d:"x = x + attn(norm(x)). The skip connection re-joins the transformed signal to the untouched residual. Gradients flow straight down this addition — the reason a deep stack trains at all. No parameters of its own."},
+    {y:290,n:"RMSNorm",t:"norm",shp:"576 → 576",pr:"576 · 0.02%",
+      d:"A second pre-norm, now guarding the feed-forward sub-layer."},
+    {y:356,n:"SwiGLU · MLP",t:"mlp",shp:"576 → 1536 → 576",pr:"2,654,208 · 75%",
+      d:"The gated feed-forward: <code>down( SiLU(gate·x) ⊙ up·x )</code>. Two parallel 576→1536 projections (gate, up), an elementwise SiLU gate, then 1536→576 back down. Acts on each position independently — and holds <b>three-quarters</b> of the block's weights."},
+    {y:422,n:"⊕ · output",t:"add",shp:"576 + 576 → 576",pr:"0",
+      d:"x = x + mlp(norm(x)). Output is still [B,&nbsp;T,&nbsp;576] — a same-shape refinement handed to the next block. Thirty of these stacked is the whole decoder."}
   ];
-  function sel(i){[].forEach.call(stack.children,function(c,k){c.classList.toggle("on",k===i);});desc.innerHTML='<div class="fig-title" style="margin-bottom:.4rem">'+stages[i].n.replace(/\s+/g," ")+'</div>'+stages[i].d;}
-  stages.forEach(function(s,i){var d=document.createElement("div");d.className="blkstage "+s.t;d.textContent=s.n;d.tabIndex=0;d.addEventListener("click",function(){sel(i);});d.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();sel(i);}});stack.appendChild(d);});
+  var tab={residual:"var(--ink-2)",norm:"var(--muted)",attn:"var(--accent)",mlp:"var(--amber)",add:"var(--good)"};
+  var p=['<line x1="'+cx+'" y1="34" x2="'+cx+'" y2="'+S[6].y+'" stroke="var(--line-2)" stroke-width="2"/>'];
+  var xb=bx+bw+30;
+  function arc(y1,y2){return '<path d="M'+cx+' '+y1+' C '+xb+' '+y1+', '+xb+' '+y2+', '+cx+' '+y2+'" fill="none" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.7"/>';}
+  p.push(arc(S[0].y+bh/2,S[3].y));
+  p.push(arc(S[3].y+15,S[6].y));
+  p.push('<text x="'+(xb+3)+'" y="'+((S[0].y+S[3].y)/2)+'" font-size="9" fill="var(--good)" style="font-family:var(--mono)">skip</text>');
+  p.push('<text x="'+(xb+3)+'" y="'+((S[3].y+S[6].y)/2)+'" font-size="9" fill="var(--good)" style="font-family:var(--mono)">skip</text>');
+  for(var i=0;i<6;i++){var ym=(S[i].y+S[i+1].y)/2;var lab=(i===0)?"[B,T,576]":"576";p.push('<text x="'+(bx-8)+'" y="'+(ym+3)+'" text-anchor="end" font-size="9" fill="var(--muted)" style="font-family:var(--mono)">'+lab+'</text>');}
+  S.forEach(function(s,i){
+    var g='<g class="blk-g" data-i="'+i+'" tabindex="0" role="button" aria-label="'+s.n.replace(/</g,"")+'">';
+    if(s.t==="add"){
+      g+='<circle cx="'+cx+'" cy="'+s.y+'" r="15" fill="var(--ground)" stroke="var(--good)" stroke-width="1.5"/>';
+      g+='<text x="'+cx+'" y="'+(s.y+5)+'" text-anchor="middle" font-size="16" fill="var(--good)">+</text>';
+      if(s.n.indexOf("output")>-1) g+='<text x="'+(cx+22)+'" y="'+(s.y+4)+'" font-size="9.5" fill="var(--good)" style="font-family:var(--mono)">output</text>';
+    } else {
+      g+='<rect x="'+bx+'" y="'+(s.y-bh/2)+'" width="'+bw+'" height="'+bh+'" rx="8" fill="var(--ground)" stroke="var(--line-2)" stroke-width="1.2"/>';
+      g+='<rect x="'+bx+'" y="'+(s.y-bh/2)+'" width="4" height="'+bh+'" rx="2" fill="'+tab[s.t]+'"/>';
+      g+='<text x="'+cx+'" y="'+(s.y+4)+'" text-anchor="middle" font-size="11" fill="var(--ink)" style="font-family:var(--mono)">'+s.n+'</text>';
+    }
+    p.push(g+'</g>');
+  });
+  svg.innerHTML=p.join("");
+  function sel(i){
+    [].forEach.call(svg.querySelectorAll(".blk-g"),function(g){g.classList.toggle("on",+g.getAttribute("data-i")===i);});
+    var s=S[i];
+    desc.innerHTML='<div class="bd-title">'+s.n+'</div>'
+      +'<div class="bd-row"><span>shape</span><b>'+s.shp+'</b></div>'
+      +'<div class="bd-row"><span>params</span><b>'+s.pr+'</b></div>'
+      +'<p>'+s.d+'</p>';
+  }
+  [].forEach.call(svg.querySelectorAll(".blk-g"),function(g){
+    var i=+g.getAttribute("data-i");
+    g.addEventListener("click",function(){sel(i);});
+    g.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();sel(i);}});
+  });
+  var timer=null;
+  if(play) play.addEventListener("click",function(){
+    if(timer) return;
+    var i=0;sel(0);
+    timer=setInterval(function(){i++;if(i>6){clearInterval(timer);timer=null;return;}sel(i);},650);
+  });
   sel(2);
 });
 
@@ -1302,6 +1397,67 @@ W(function(){
     seg([{l:"LM (SmolLM2)",v:134.5,t:"135M · 61%",c:"var(--accent)"},{l:"ViT (SigLIP2)",v:85.7,t:"86M · 39%",c:"var(--img)"},{l:"projector",v:1.77,t:"1.8M · 0.8%",c:"var(--good)"}])+
     '<div class="hint" style="margin:1rem 0 .35rem">inside one decoder block · 3.5M parameters</div>'+
     seg([{l:"SwiGLU MLP (gate, up, down)",v:75,t:"75%",c:"var(--amber)"},{l:"attention (q, k, v, o)",v:25,t:"25%",c:"var(--accent)"}]);
+});
+
+/* ---------- END-TO-END FORWARD-PASS PIPELINE ---------- */
+W(function(){
+  var wrap=document.getElementById("pipe"),cv=document.getElementById("pipe-canvas"),
+      desc=document.getElementById("pipe-desc"),list=document.getElementById("pipe-list"),
+      play=document.getElementById("pipe-play"),stepb=document.getElementById("pipe-step"),imgseg=document.getElementById("pipe-img");
+  if(!wrap||!cv||!desc||!list) return;
+  var ctx=cv.getContext?cv.getContext("2d"):null; if(!ctx) return;
+  var CW=300,CH=240,DPR=2;
+  cv.width=CW*DPR;cv.height=CH*DPR;cv.style.width=CW+"px";cv.style.height=CH+"px";ctx.scale(DPR,DPR);
+  function V(n){return (getComputedStyle(document.documentElement).getPropertyValue(n)||"").trim()||"#888";}
+  var total=(DATA.receiptTarget&&DATA.receiptTarget.total)||"9.00";
+  var ST=[
+    {k:"input",n:"1 · image + prompt",shp:"pixels + text",
+      d:"A 256×256 image and a text prompt (\"What is the total?\"). The image feeds the ViT; the prompt — carrying an <code>&lt;image&gt;</code> placeholder — feeds the language model."},
+    {k:"patch",n:"2 · patchify",shp:"[3,256,256] → 256 patches",
+      d:"The image is cut into a 16×16 grid of non-overlapping 16-pixel patches — 256 of them. A single convolution flattens and projects each patch to a 768-dim vector: the ViT's \"tokens\"."},
+    {k:"vit",n:"3 · ViT encoder",shp:"256 × 768",
+      d:"Twelve <b>bidirectional</b> transformer layers (SigLIP2). Every patch attends to every other patch — no causal mask — yielding 256 contextualized patch embeddings of width 768."},
+    {k:"proj",n:"4 · projector",shp:"256 × 768 → 64 × 576",
+      d:"Pixel-shuffle folds each 2×2 neighborhood of patches into one token (256 → 64) while stacking their channels (768 → 3072), then a Linear maps 3072 → 576, the LM's width. Fewer, richer image tokens."},
+    {k:"splice",n:"5 · splice into text",shp:"→ [T, 576]",
+      d:"The 64 image tokens overwrite the <code>&lt;image&gt;</code> placeholder inside the embedded text. From here the LM sees one uniform stream of 576-dim vectors and <em>cannot tell</em> image rows from text rows by shape."},
+    {k:"decode",n:"6 · decoder ×30",shp:"[T,576] → [T,576]",
+      d:"The spliced sequence flows through 30 <b>causal</b> decoder blocks — the block from §2. Text positions attend back over the image tokens: this is where \"looking at the picture\" physically happens."},
+    {k:"predict",n:"7 · head → token",shp:"[T,576] → [T,49218]",
+      d:"The tied head projects each final hidden state to 49,218 logits; a softmax gives next-token probabilities. Argmax (or sampling) emits the answer one token at a time."}
+  ];
+  var IMG={},curImg="receipt";
+  ["receipt","cat"].forEach(function(kk){var im=new Image();im.onload=function(){if(ST[cur].k==="input"||ST[cur].k==="patch")draw(cur,1);};im.src=DATA[kk];IMG[kk]=im;});
+  // ---- canvas helpers ----
+  function lab(t,x,y,c,s,a){ctx.fillStyle=c||V("--muted");ctx.font=(s||10)+"px ui-monospace,SFMono-Regular,Menlo,monospace";ctx.textAlign=a||"left";ctx.textBaseline="alphabetic";ctx.fillText(t,x,y);}
+  function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  function srand(s){return function(){s=(s*9301+49297)%233280;return s/233280;};}
+  function bars(x0,x1,base,maxh,n,col,seed,alpha){var r=srand(seed),w=(x1-x0)/n,bw=Math.max(1.4,w*0.6);ctx.globalAlpha=alpha==null?1:alpha;ctx.fillStyle=col;for(var i=0;i<n;i++){var h=maxh*(0.32+0.66*r());var x=x0+i*w+(w-bw)/2;ctx.fillRect(x,base-h,bw,h);}ctx.globalAlpha=1;}
+  function arrow(x0,y0,x1,y1,col){ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();var a=Math.atan2(y1-y0,x1-x0);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1-6*Math.cos(a-0.5),y1-6*Math.sin(a-0.5));ctx.lineTo(x1-6*Math.cos(a+0.5),y1-6*Math.sin(a+0.5));ctx.closePath();ctx.fill();}
+  function contain(im,x,y,w,h){if(!im||!im.complete||!im.naturalWidth){ctx.fillStyle=V("--panel-2");ctx.fillRect(x,y,w,h);return;}var s=Math.min(w/im.naturalWidth,h/im.naturalHeight),dw=im.naturalWidth*s,dh=im.naturalHeight*s;ctx.drawImage(im,x+(w-dw)/2,y+(h-dh)/2,dw,dh);}
+  function chip(x,y,w,h,fill,stroke,txt){ctx.fillStyle=fill;rr(x,y,w,h,6);ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=1.2;ctx.stroke();if(txt)lab(txt,x+w/2,y+h/2+3,stroke,9,"center");}
+  // ---- per-stage drawers ----
+  function dInput(){lab("input",14,20,V("--ink-2"),11);contain(IMG[curImg],92,26,116,116);ctx.strokeStyle=V("--line-2");ctx.lineWidth=1;ctx.strokeRect(92,26,116,116);lab("prompt",14,164,V("--muted"),9);chip(40,172,220,26,V("--panel-2"),V("--line-2"),"What is the total?");lab("carries an <image> placeholder",150,218,V("--muted"),9,"center");}
+  function dPatch(p){var x=74,y=22,S=168;contain(IMG[curImg],x,y,S,S);var g=8,k=Math.floor(p*g*g);ctx.globalAlpha=0.30;ctx.fillStyle=V("--accent");for(var i=0;i<k;i++){var rr2=Math.floor(i/g),c=i%g;ctx.fillRect(x+c*S/g,y+rr2*S/g,S/g,S/g);}ctx.globalAlpha=1;ctx.strokeStyle=V("--line-2");ctx.lineWidth=0.6;for(var j=0;j<=g;j++){ctx.beginPath();ctx.moveTo(x+j*S/g,y);ctx.lineTo(x+j*S/g,y+S);ctx.stroke();ctx.beginPath();ctx.moveTo(x,y+j*S/g);ctx.lineTo(x+S,y+j*S/g);ctx.stroke();}ctx.strokeStyle=V("--img");ctx.lineWidth=1.3;ctx.strokeRect(x,y,S,S);lab("16 × 16 grid  =  256 patches",150,214,V("--muted"),10,"center");}
+  function dViT(){lab("256 patch tokens · width 768",150,22,V("--ink-2"),10,"center");arrow(60,44,240,44,V("--img"));arrow(240,44,60,44,V("--img"));lab("every patch ↔ every patch",150,62,V("--img"),9,"center");bars(26,274,180,104,42,V("--img"),7);lab("bidirectional · no causal mask",150,208,V("--muted"),9,"center");}
+  function dProj(p){lab("pixel-shuffle · 2×2 fold + Linear",150,22,V("--ink-2"),10,"center");bars(22,132,168,86,32,V("--img"),7,1-0.55*p);lab("256 × 768",77,190,V("--muted"),9,"center");arrow(140,120,172,120,V("--accent"));lab("÷4",156,110,V("--accent"),9,"center");bars(182,286,168,44+68*p,10,V("--accent"),3);lab("64 × 576",234,190,V("--accent-ink"),9,"center");}
+  function dSplice(){lab("one sequence the LM reads · [T, 576]",150,22,V("--ink-2"),10,"center");var y=64,h=34;chip(22,y,38,h,V("--panel-2"),V("--line-2"),"txt");chip(64,y,38,h,V("--panel-2"),V("--line-2"),"txt");chip(106,y,116,h,V("--img-soft"),V("--img"),"64 image");chip(226,y,52,h,V("--panel-2"),V("--line-2"),"txt");lab("grey = text embeddings   ·   cyan = image tokens",150,132,V("--muted"),9,"center");lab("every cell is a 576-vector —",150,158,V("--muted"),9,"center");lab("the LM can't tell them apart by shape",150,174,V("--muted"),9,"center");}
+  function dDecode(){lab("30 causal decoder blocks (§2)",150,22,V("--ink-2"),10,"center");var y=42,h=24;chip(30,y,26,h,V("--panel-2"),V("--line-2"));chip(58,y,74,h,V("--img-soft"),V("--img"),"image");chip(134,y,26,h,V("--panel-2"),V("--line-2"));chip(162,y,60,h,V("--panel-2"),V("--line-2"),"answer");var gx=96,gy=96,cs=13,g=8;ctx.fillStyle=V("--accent");for(var i=0;i<g;i++)for(var j=0;j<=i;j++){ctx.globalAlpha=0.15+0.6*(j/g);ctx.fillRect(gx+j*cs,gy+i*cs,cs-2,cs-2);}ctx.globalAlpha=1;lab("causal mask",gx+g*cs+10,gy+40,V("--muted"),9,"left");lab("×30",250,110,V("--amber"),13,"center");arrow(178,y+h,120,gy-4,V("--muted"));lab("answer attends back over image → \"seeing\"",150,214,V("--muted"),9,"center");}
+  function dPredict(p){lab("head → 49,218 logits → softmax",150,22,V("--ink-2"),10,"center");var C=[["“"+total+"”",0.71],["RM "+total,0.12],["10.00",0.08],["{",0.05],["the",0.04]];var x0=84,bw=150,y0=46,rh=28;C.forEach(function(c,i){var w=Math.max(2,bw*c[1]*p),top=i===0;ctx.globalAlpha=top?1:0.5;ctx.fillStyle=top?V("--good"):V("--accent");rr(x0,y0+i*rh,w,17,4);ctx.fill();ctx.globalAlpha=1;lab(c[0],x0-6,y0+i*rh+13,V("--ink-2"),9,"right");lab((c[1]*100).toFixed(0)+"%",x0+w+6,y0+i*rh+13,V("--muted"),9,"left");});lab("→ emits  “"+total+"”",150,214,V("--good"),12,"center");}
+  var DR={input:dInput,patch:dPatch,vit:dViT,proj:dProj,splice:dSplice,decode:dDecode,predict:dPredict};
+  function draw(i,p){ctx.clearRect(0,0,CW,CH);(DR[ST[i].k]||function(){})(p);}
+  // ---- state / interaction ----
+  var cur=0,raf=null;
+  function animate(i){if(raf){cancelAnimationFrame(raf);raf=null;}var t0=null;(function loop(ts){if(t0==null)t0=ts;var p=Math.min(1,(ts-t0)/620);draw(i,p);if(p<1)raf=requestAnimationFrame(loop);else raf=null;})(performance.now());}
+  function sel(i){cur=i;[].forEach.call(list.children,function(c){c.classList.toggle("on",+c.getAttribute("data-i")===i);});var s=ST[i];desc.innerHTML='<div class="bd-title">'+s.n+'</div><div class="bd-row"><span>shape</span><b>'+s.shp+'</b></div><p>'+s.d+'</p>';var k=s.k;if(k==="patch"||k==="proj"||k==="predict")animate(i);else{if(raf){cancelAnimationFrame(raf);raf=null;}draw(i,1);}}
+  ST.forEach(function(s,i){var d=document.createElement("div");d.className="pstage "+s.k;d.setAttribute("data-i",i);d.tabIndex=0;d.setAttribute("role","button");d.innerHTML='<span class="pn">'+s.n+'</span><span class="psh">'+s.shp+'</span>';d.addEventListener("click",function(){stop();sel(i);});d.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();stop();sel(i);}});list.appendChild(d);});
+  var runner=null;
+  function stop(){if(runner){clearInterval(runner);runner=null;if(play)play.textContent="▶ run the forward pass";}}
+  if(play)play.addEventListener("click",function(){if(runner){stop();return;}play.textContent="⏸ pause";var i=0;sel(0);runner=setInterval(function(){i++;if(i>6){stop();return;}sel(i);},1050);});
+  if(stepb)stepb.addEventListener("click",function(){stop();sel((cur+1)%7);});
+  if(imgseg)[].forEach.call(imgseg.querySelectorAll("button"),function(b){b.addEventListener("click",function(){[].forEach.call(imgseg.querySelectorAll("button"),function(x){x.classList.remove("on");});b.classList.add("on");curImg=b.getAttribute("data-img");draw(cur,1);});});
+  try{new MutationObserver(function(){draw(cur,1);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});}catch(e){}
+  sel(0);
 });
 
 })();
