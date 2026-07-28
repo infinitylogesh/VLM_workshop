@@ -654,6 +654,23 @@ labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never tr
       <span class="hint">the receipt image + instruction + schema are all masked</span></div>
     <div class="tokrow" id="mask2-row" style="margin-top:.8rem"></div>
   </figure>
+  <h3>The loss, up close: cross-entropy</h3>
+  <p>What is actually minimized is the token-level <strong>cross-entropy</strong> (negative log-likelihood)
+  over the answer positions only — the same objective as Part I §6, and the whole of SFT:</p>
+  <math display="block"><mrow><msub><mi>ℒ</mi><mi>SFT</mi></msub><mo>=</mo><mo>−</mo><mfrac><mn>1</mn><mrow><mo>|</mo><mi>𝒮</mi><mo>|</mo></mrow></mfrac><munder><mo>∑</mo><mrow><mi>t</mi><mo>∈</mo><mi>𝒮</mi></mrow></munder><mi>log</mi><mspace width="0.15em"/><msub><mi>p</mi><mi>θ</mi></msub><mo>(</mo><msub><mi>y</mi><mi>t</mi></msub><mo>∣</mo><msub><mi>x</mi><mrow><mo>&lt;</mo><mi>t</mi></mrow></msub><mo>)</mo></mrow></math>
+  <p>At each answer position the model produces a distribution over the whole vocabulary; the loss reads off the
+  probability of the <em>one</em> gold token and charges <math><mrow><mo>−</mo><mi>log</mi><mspace width="0.12em"/><mi>p</mi></mrow></math>.
+  Drag the probability the model assigns that gold token and watch the penalty move along the −log curve:</p>
+  <figure class="fig reveal" id="fig-ce">
+    <div class="fig-title">cross-entropy · one answer position</div>
+    <div class="sliderrow">p(gold token) <input type="range" id="ce-range" min="2" max="99" value="35"><span class="val" id="ce-val">0.35</span></div>
+    <canvas id="ce-canvas" width="1040" height="380" style="margin-top:.6rem;width:100%;border-radius:8px"></canvas>
+    <figcaption id="ce-cap"></figcaption>
+  </figure>
+  <div class="take"><div class="ct">how it serves the objective</div>Cross-entropy is <b>mode-seeking on a
+  single correct answer</b>: it only rewards probability on the gold token, which is exactly right when the
+  target is a fixed string (the gold JSON). It is also why <b>masking</b> matters — the pressure lands on the
+  answer, not on re-predicting the receipt image or the schema.</div>
   <h3>What a training run actually looks like</h3>
   <p>The loop is standard but the settings matter: a warmup-then-cosine learning rate, bf16, gradient
   accumulation to fake a big batch, gradient checkpointing to fit memory, and a <em>fused</em>
@@ -719,9 +736,22 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   <p>The scalar becomes a gradient through the <strong>group-relative advantage</strong>: for a group of
   <math><mi>G</mi></math> completions, normalize each reward within the group,</p>
   <math display="block"><mrow><msub><mi>A</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>−</mo><mi>mean</mi><mo>(</mo><mi>r</mi><mo>)</mo></mrow><mrow><mi>std</mi><mo>(</mo><mi>r</mi><mo>)</mo></mrow></mfrac></mrow></math>
-  <p>and push up the tokens of above-average completions, down the below-average ones. No gold tokens, no
-  KL term (this repo runs <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math>, so no reference model).
-  Here is the mechanism — and its failure mode — live:</p>
+  <p>The group mean is the baseline — no separate value network needed. Those advantages enter GRPO's
+  <strong>clipped surrogate objective</strong> (with <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math>
+  here there is no KL-to-reference term):</p>
+  <math display="block"><mrow><mi>𝒥</mi><mo>(</mo><mi>θ</mi><mo>)</mo><mo>=</mo><mi>𝔼</mi><mo>[</mo><mfrac><mn>1</mn><mi>G</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>G</mi></munderover><mfrac><mn>1</mn><mrow><mo>|</mo><msub><mi>o</mi><mi>i</mi></msub><mo>|</mo></mrow></mfrac><munder><mo>∑</mo><mi>t</mi></munder><mi>min</mi><mo>(</mo><msub><mi>ρ</mi><mrow><mi>i</mi><mi>t</mi></mrow></msub><msub><mi>A</mi><mi>i</mi></msub><mo>,</mo><mi>clip</mi><mo>(</mo><msub><mi>ρ</mi><mrow><mi>i</mi><mi>t</mi></mrow></msub><mo>,</mo><mn>1</mn><mo>−</mo><mi>ε</mi><mo>,</mo><mn>1</mn><mo>+</mo><mi>ε</mi><mo>)</mo><msub><mi>A</mi><mi>i</mi></msub><mo>)</mo><mo>]</mo></mrow></math>
+  <p>where <math><mrow><msub><mi>ρ</mi><mrow><mi>i</mi><mi>t</mi></mrow></msub><mo>=</mo><msub><mi>π</mi><mi>θ</mi></msub><mo>/</mo><msub><mi>π</mi><mi>old</mi></msub></mrow></math>
+  is the importance ratio. The <em>sign</em> of the advantage sets the direction — raise the probability of
+  tokens from above-average completions, lower the below-average — and the <strong>clip</strong> bounds how far
+  a single update may move the policy. Drag the advantage to see the surrogate for one token:</p>
+  <figure class="fig reveal" id="fig-clip">
+    <div class="fig-title">grpo · the clipped surrogate for one token</div>
+    <div class="sliderrow">advantage A <input type="range" id="clip-range" min="-200" max="200" value="120"><span class="val" id="clip-val">+1.20</span></div>
+    <canvas id="clip-canvas" width="1040" height="360" style="margin-top:.6rem;width:100%;border-radius:8px"></canvas>
+    <figcaption id="clip-cap"></figcaption>
+  </figure>
+  <p>No gold tokens are involved — only the policy re-weighting its own samples. That design has a sharp failure
+  mode; here it is, live:</p>
   <figure class="fig reveal" id="fig-rollout">
     <div class="fig-title">grpo · a group of 8, and why it can stall</div>
     <div class="sliderrow">SFT quality (how good the policy already is) <input type="range" id="rollout-range" min="0" max="100" value="30"><span class="val" id="rollout-val">30%</span></div>
@@ -768,6 +798,20 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   on-policy GKD the student <em>samples</em> a completion; both student and the frozen 4B teacher score those
   tokens; and a generalized Jensen–Shannon divergence pulls the student's distribution toward the teacher's.
   The teacher's <em>full distribution</em> is a far richer signal than one gold label.</p>
+  <h3>The loss: matching a distribution, not a label</h3>
+  <p>SFT's target is a one-hot vector — all mass on the gold token. Distillation's target is the teacher's
+  <em>entire</em> next-token distribution, and the loss is a <strong>KL divergence</strong> that pulls the
+  student <math><mi>s</mi></math> onto the teacher <math><mi>t</mi></math>:</p>
+  <math display="block"><mrow><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo><mo>=</mo><munder><mo>∑</mo><mi>v</mi></munder><mi>t</mi><mo>(</mo><mi>v</mi><mo>)</mo><mspace width="0.15em"/><mi>log</mi><mfrac><mrow><mi>t</mi><mo>(</mo><mi>v</mi><mo>)</mo></mrow><mrow><mi>s</mi><mo>(</mo><mi>v</mi><mo>)</mo></mrow></mfrac></mrow></math>
+  <p>The teacher's small probabilities on <em>plausible</em> tokens — its "dark knowledge" — are exactly the
+  signal a one-hot label discards. Toggle the target the student is trained against:</p>
+  <figure class="fig reveal" id="fig-soft">
+    <div class="fig-title">the target · one-hot label vs teacher distribution</div>
+    <div class="controls"><div class="seg" id="soft-seg"><button class="on" data-t="hard">SFT · one-hot</button><button data-t="soft">GKD · teacher soft</button></div>
+      <span class="hint">same answer position, different target</span></div>
+    <canvas id="soft-canvas" width="1040" height="300" style="margin-top:.6rem;width:100%;border-radius:8px"></canvas>
+    <figcaption id="soft-cap"></figcaption>
+  </figure>
   <p>The <math><mi>β</mi></math> knob picks the divergence's character. See what it does to a student trying
   to match a two-mode teacher:</p>
   <figure class="fig reveal" id="fig-beta">
@@ -779,6 +823,18 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   <math display="block"><mrow><mi>ℒ</mi><mo>=</mo><mi>β</mi><mspace width="0.15em"/><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mspace width="0.15em"/><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math>
   <p>with <math><mi>t</mi></math> the teacher and <math><mi>s</mi></math> the student distribution over the
   next token. <math><mrow><mi>β</mi><mo>=</mo><mn>0.5</mn></mrow></math> is the symmetric JS divergence.</p>
+  <details class="deep"><summary>Go deeper: forward vs reverse KL, and why on-policy</summary><div class="dbody">
+    <p><b>Forward KL</b> <math><mrow><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo></mrow></math>
+    (β→1) is <em>mode-covering</em>: the <math><mrow><mi>log</mi><mo>(</mo><mi>t</mi><mo>/</mo><mi>s</mi><mo>)</mo></mrow></math>
+    term explodes wherever the teacher has mass but the student assigns ≈0, forcing the student to cover every
+    teacher mode — safe, but it can smear probability onto unlikely tokens. <b>Reverse KL</b>
+    <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math> (β→0) is
+    <em>mode-seeking</em>: the student may drop teacher modes as long as its own mass sits under the teacher —
+    sharper, but it can collapse. The generalized JSD at β=0.5 interpolates. <b>On-policy</b> means the
+    divergence is measured on tokens the <em>student itself</em> sampled, so training fixes the student's own
+    mistakes rather than teacher text it would never produce — the reason on-policy GKD beats plain
+    sequence-level distillation on a fixed teacher corpus.</p>
+  </div></details>
   <figure class="fig reveal" id="fig-gkdloss">
     <div class="fig-title">real run · student GKD loss (0.8B)</div>
     <svg id="gkdloss-svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="gkd loss"></svg>
@@ -848,6 +904,20 @@ Here is the correct extraction for reference:
     model itself. Its appeal isn't peak score but <b>learning without a teacher model</b> and <b>resisting
     forgetting</b> (Shenfeld et&nbsp;al., "Self-Distillation Enables Continual Learning").</figcaption>
   </figure>
+  <h3>The loss, and why it resists forgetting</h3>
+  <p>The objective is the same JSD as GKD, but the teacher is the model's <em>own</em> base weights conditioned
+  on the demonstration:</p>
+  <math display="block"><mrow><msub><mi>ℒ</mi><mi>SDFT</mi></msub><mo>=</mo><mi>JSD</mi><mo>(</mo><msub><mi>p</mi><mi>base</mi></msub><mo>(</mo><mo>·</mo><mo>∣</mo><mi>prompt</mi><mo>,</mo><mi>gold</mi><mo>)</mo><mspace width="0.15em"/><mo>∥</mo><mspace width="0.15em"/><msub><mi>p</mi><mi>θ</mi></msub><mo>(</mo><mo>·</mo><mo>∣</mo><mi>prompt</mi><mo>)</mo><mo>)</mo></mrow></math>
+  <p>Because the target is the base model's own (demonstration-informed) belief rather than a hard label, the
+  student is pulled toward a distribution it <em>already nearly holds</em> — a small, safe step that teaches the
+  task without dragging the weights far from their general-purpose start. That is the anti-forgetting mechanism,
+  made visible:</p>
+  <figure class="fig reveal" id="fig-drift">
+    <div class="fig-title">schematic · task learning vs drift from the base</div>
+    <div class="sliderrow">training progress <input type="range" id="drift-range" min="0" max="100" value="55"><span class="val" id="drift-val">55%</span></div>
+    <canvas id="drift-canvas" width="1040" height="300" style="margin-top:.6rem;width:100%;border-radius:8px"></canvas>
+    <figcaption id="drift-cap"></figcaption>
+  </figure>
   <figure class="fig reveal" id="fig-sdftloss">
     <div class="fig-title">real run · SDFT loss (0.8B, self-teacher)</div>
     <svg id="sdftloss-svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="sdft loss"></svg>
@@ -857,6 +927,17 @@ Here is the correct extraction for reference:
 <section class="section" id="s11">
   <div class="snum">Section 11</div>
   <h2>All four, side by side</h2>
+  <p>Every method is really one statement — <em>which distribution should the next token be pulled toward, and
+  what supplies it?</em></p>
+  <div class="tbl"><table>
+    <thead><tr><th>method</th><th>loss</th><th>target the token is pulled toward</th><th>signal from</th><th>fails when</th></tr></thead>
+    <tbody>
+      <tr><td><b>SFT</b></td><td>cross-entropy</td><td>one-hot gold token</td><td>human labels</td><td>only one right answer; can overfit &amp; forget</td></tr>
+      <tr><td><b>GRPO</b></td><td>clipped policy-gradient</td><td><em>no fixed target</em> — re-weight own samples by advantage</td><td>a scalar reward</td><td>reward saturates → zero variance → no gradient</td></tr>
+      <tr><td><b>GKD</b></td><td>generalized JSD</td><td>a bigger teacher's full distribution</td><td>a separate teacher</td><td>need a teacher; vocab &amp; image tokens must match</td></tr>
+      <tr><td><b>SDFT</b></td><td>JSD (self-teacher)</td><td>the base model's demo-informed distribution</td><td>the model itself + a demonstration</td><td>modest peak; base must already be competent</td></tr>
+    </tbody>
+  </table></div>
   <p>Every stage was evaluated the same way (greedy decode, 100 SROIE + 100 CORD). Headline = macro
   <em>pair_f1</em> — did it get both the key <em>and</em> the value. Hover a bar:</p>
   <figure class="fig reveal" id="fig-chart">
@@ -1458,6 +1539,111 @@ W(function(){
   if(imgseg)[].forEach.call(imgseg.querySelectorAll("button"),function(b){b.addEventListener("click",function(){[].forEach.call(imgseg.querySelectorAll("button"),function(x){x.classList.remove("on");});b.classList.add("on");curImg=b.getAttribute("data-img");draw(cur,1);});});
   try{new MutationObserver(function(){draw(cur,1);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});}catch(e){}
   sel(0);
+});
+
+/* ---------- loss widgets (Part II) ---------- */
+function cvSetup(cv,w,h){var d=2;cv.width=w*d;cv.height=h*d;cv.style.height=h+"px";var x=cv.getContext&&cv.getContext("2d");if(!x)return null;x.scale(d,d);return x;}
+
+/* SFT · cross-entropy explorer */
+W(function(){
+  var r=document.getElementById("ce-range"),val=document.getElementById("ce-val"),cv=document.getElementById("ce-canvas"),cap=document.getElementById("ce-cap");
+  if(!cv)return;var ctx=cvSetup(cv,520,190);if(!ctx)return;
+  var toks=["9.00","9,00","10.00","RM","{","the"],base=[0,0.30,0.25,0.22,0.13,0.10];
+  function draw(){
+    var p=+r.value/100;val.textContent=p.toFixed(2);var rest=1-p;
+    var probs=toks.map(function(t,i){return i===0?p:base[i]*rest;});
+    ctx.clearRect(0,0,520,190);
+    ctx.fillStyle=css("--ink-2");ctx.textAlign="left";ctx.font="10px "+css("--sans");ctx.fillText("model's distribution  (gold = green)",8,15);
+    var x0=8,bw=40,gap=6,baseY=155,mh=118;
+    toks.forEach(function(t,i){var hh=Math.max(1,probs[i]*mh);var x=x0+i*(bw+gap);
+      ctx.fillStyle=i===0?css("--good"):css("--accent");ctx.globalAlpha=i===0?1:0.5;ctx.fillRect(x,baseY-hh,bw,hh);ctx.globalAlpha=1;
+      ctx.fillStyle=css("--muted");ctx.font="9px "+css("--mono");ctx.textAlign="center";ctx.fillText(t,x+bw/2,baseY+13);ctx.fillText((probs[i]*100).toFixed(0)+"%",x+bw/2,baseY-hh-4);});
+    var gx=332,gw=176,gy=26,gh=128,ymax=4.6;
+    ctx.strokeStyle=css("--line");ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(gx,gy+gh);ctx.lineTo(gx+gw,gy+gh);ctx.stroke();
+    ctx.strokeStyle=css("--accent");ctx.lineWidth=2.2;ctx.beginPath();
+    for(var i=0;i<=120;i++){var pp=0.01+i/120*0.99,yy=Math.min(-Math.log(pp),ymax);var px=gx+pp*gw,py=gy+gh-yy/ymax*gh;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+    ctx.stroke();
+    var yy=-Math.log(p),px=gx+p*gw,py=gy+gh-Math.min(yy,ymax)/ymax*gh;
+    ctx.strokeStyle=css("--line-2");ctx.setLineDash([2,2]);ctx.beginPath();ctx.moveTo(px,gy+gh);ctx.lineTo(px,py);ctx.lineTo(gx,py);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=css("--good");ctx.beginPath();ctx.arc(px,py,4.5,0,7);ctx.fill();
+    ctx.fillStyle=css("--ink-2");ctx.font="10px "+css("--sans");ctx.textAlign="left";ctx.fillText("penalty  ℓ = −log p",gx,16);
+    ctx.fillStyle=css("--muted");ctx.textAlign="center";ctx.font="9px "+css("--mono");ctx.fillText("p(gold) →",gx+gw/2,gy+gh+13);
+    ctx.fillStyle=css("--accent-ink");ctx.font="13px "+css("--mono");ctx.textAlign="right";ctx.fillText("ℓ = "+yy.toFixed(2)+" nats",512,gy+2);
+    cap.innerHTML=p>0.8?"Confident and correct — the penalty is nearly <b>0</b> and the gradient fades.":p<0.15?"The model barely believes the gold token — a <b>large</b> penalty and a strong corrective gradient.":"Middling confidence — the loss is just the height of the green dot on the −log curve.";
+  }
+  r.addEventListener("input",draw);onView(cv,draw);draw();new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+});
+
+/* GRPO · clipped surrogate diagram */
+W(function(){
+  var r=document.getElementById("clip-range"),val=document.getElementById("clip-val"),cv=document.getElementById("clip-canvas"),cap=document.getElementById("clip-cap");
+  if(!cv)return;var ctx=cvSetup(cv,520,180);if(!ctx)return;var eps=0.2,rmin=0.5,rmax=1.5;
+  function draw(){
+    var A=+r.value/100;val.textContent=(A>=0?"+":"")+A.toFixed(2);
+    ctx.clearRect(0,0,520,180);
+    var gx=52,gw=430,gy=16,gh=126,ymax=Math.max(0.6,Math.abs(A)*rmax*1.06),ymin=-ymax;
+    function X(rho){return gx+(rho-rmin)/(rmax-rmin)*gw;}
+    function Y(v){return gy+gh*(ymax-v)/(ymax-ymin);}
+    ctx.fillStyle=css("--accent-soft");ctx.globalAlpha=0.5;ctx.fillRect(X(1-eps),gy,X(1+eps)-X(1-eps),gh);ctx.globalAlpha=1;
+    ctx.strokeStyle=css("--line");ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(gx,Y(0));ctx.lineTo(gx+gw,Y(0));ctx.stroke();
+    ctx.setLineDash([3,3]);ctx.strokeStyle=css("--line-2");ctx.beginPath();ctx.moveTo(X(1),gy);ctx.lineTo(X(1),gy+gh);ctx.stroke();ctx.setLineDash([]);
+    ctx.setLineDash([4,3]);ctx.strokeStyle=css("--muted");ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(X(rmin),Y(rmin*A));ctx.lineTo(X(rmax),Y(rmax*A));ctx.stroke();ctx.setLineDash([]);
+    ctx.strokeStyle=css("--accent");ctx.lineWidth=2.6;ctx.beginPath();
+    for(var i=0;i<=200;i++){var rho=rmin+(rmax-rmin)*i/200,cl=Math.max(1-eps,Math.min(1+eps,rho)),obj=Math.min(rho*A,cl*A);var px=X(rho),py=Y(obj);if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+    ctx.stroke();
+    ctx.fillStyle=css("--muted");ctx.font="9px "+css("--mono");ctx.textAlign="center";
+    ctx.fillText("1−ε",X(1-eps),gy+gh+12);ctx.fillText("ρ=1",X(1),gy+gh+12);ctx.fillText("1+ε",X(1+eps),gy+gh+12);
+    ctx.fillText("importance ratio  ρ = π_θ / π_old",gx+gw/2,gy+gh+26);
+    ctx.save();ctx.translate(12,gy+gh/2);ctx.rotate(-Math.PI/2);ctx.textAlign="center";ctx.fillText("surrogate objective",0,0);ctx.restore();
+    ctx.textAlign="left";ctx.fillText("dashed = ρ·A    solid = min(ρ·A, clip·A)",gx,12);
+    cap.innerHTML=A>=0?"<b>Advantage &gt; 0</b> (a good completion): the objective rises with ρ — push this token's probability up — then goes <b>flat past 1+ε</b>. Beyond the clip there is no reward for moving further, so one update can't over-commit.":"<b>Advantage &lt; 0</b> (a bad completion): the objective pushes ρ down — lower this token's probability — and is <b>clipped below 1−ε</b>. The clip is the stability leash on every step.";
+  }
+  r.addEventListener("input",draw);onView(cv,draw);draw();new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+});
+
+/* GKD · soft target vs one-hot */
+W(function(){
+  var seg=document.getElementById("soft-seg"),cv=document.getElementById("soft-canvas"),cap=document.getElementById("soft-cap");
+  if(!cv||!seg)return;var ctx=cvSetup(cv,520,150);if(!ctx)return;var mode="hard";
+  var toks=["9.00","9,00","10.00","RM 9","{","the"],soft=[0.62,0.14,0.10,0.06,0.05,0.03];
+  function draw(){
+    ctx.clearRect(0,0,520,150);var probs=mode==="hard"?[1,0,0,0,0,0]:soft;
+    ctx.fillStyle=css("--ink-2");ctx.textAlign="left";ctx.font="10px "+css("--sans");
+    ctx.fillText(mode==="hard"?"SFT target — one-hot on the gold token":"GKD target — the 4B teacher's full distribution",20,16);
+    var x0=20,bw=56,gap=18,baseY=116,mh=84;
+    toks.forEach(function(t,i){var hh=Math.max(1,probs[i]*mh);var x=x0+i*(bw+gap);
+      ctx.fillStyle=i===0?css("--good"):css("--accent");ctx.globalAlpha=i===0?1:0.55;ctx.fillRect(x,baseY-hh,bw,hh);ctx.globalAlpha=1;
+      ctx.fillStyle=css("--muted");ctx.font="9px "+css("--mono");ctx.textAlign="center";ctx.fillText(t,x+bw/2,baseY+13);
+      if(probs[i]>0.001)ctx.fillText((probs[i]*100).toFixed(0)+"%",x+bw/2,baseY-hh-4);});
+    cap.innerHTML=mode==="hard"?"A one-hot label says only “9.00” is right and everything else is equally wrong. Cross-entropy against it = <b>−log p(gold)</b> — one bit of information per token.":"The teacher also says <b>“9,00” and “10.00” are near-misses</b> and “the” is absurd — a ranking over the whole vocabulary. Matching this <em>soft</em> target (a KL) gives the student far more per token, which is why the 0.8B gains where labels plateaued.";
+  }
+  [].forEach.call(seg.querySelectorAll("button"),function(b){b.addEventListener("click",function(){[].forEach.call(seg.querySelectorAll("button"),function(x){x.classList.remove("on");});b.classList.add("on");mode=b.getAttribute("data-t");draw();});});
+  onView(cv,draw);draw();new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+});
+
+/* SDFT · drift / forgetting schematic */
+W(function(){
+  var r=document.getElementById("drift-range"),val=document.getElementById("drift-val"),cv=document.getElementById("drift-canvas"),cap=document.getElementById("drift-cap");
+  if(!cv)return;var ctx=cvSetup(cv,520,150);if(!ctx)return;
+  function draw(){
+    var p=+r.value/100;val.textContent=(p*100).toFixed(0)+"%";
+    ctx.clearRect(0,0,520,150);var ax0=140,ax1=498;
+    ctx.fillStyle=css("--bad-soft");ctx.globalAlpha=0.55;ctx.fillRect(ax0+(ax1-ax0)*0.6,18,(ax1-ax0)*0.4,104);ctx.globalAlpha=1;
+    ctx.fillStyle=css("--bad");ctx.font="9px "+css("--sans");ctx.textAlign="center";ctx.fillText("far from base → forgetting",ax0+(ax1-ax0)*0.8,30);
+    ctx.fillStyle=css("--muted");ctx.textAlign="center";ctx.fillText("base",ax0,16);
+    function track(y,label,drift,col){
+      ctx.strokeStyle=css("--line");ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ax0,y);ctx.lineTo(ax1,y);ctx.stroke();
+      ctx.fillStyle=css("--ink-2");ctx.font="10px "+css("--sans");ctx.textAlign="right";ctx.fillText(label,ax0-12,y+4);
+      ctx.fillStyle=css("--muted");ctx.beginPath();ctx.arc(ax0,y,4,0,7);ctx.fill();
+      var mx=ax0+(ax1-ax0)*drift*p;
+      ctx.strokeStyle=col;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(ax0,y);ctx.lineTo(mx,y);ctx.stroke();ctx.setLineDash([]);
+      ctx.fillStyle=col;ctx.beginPath();ctx.arc(mx,y,6,0,7);ctx.fill();}
+    track(50,"SFT (hard label)",0.9,css("--bad"));
+    track(96,"SDFT (self-teacher)",0.22,css("--good"));
+    ctx.fillStyle=css("--muted");ctx.textAlign="center";ctx.font="9px "+css("--sans");ctx.fillText("← distance of the weights from the general-purpose base →",(ax0+ax1)/2,140);
+    cap.innerHTML="<b>Schematic.</b> Both learn the task, but a hard label drags the weights far from the base, into the forgetting zone; SDFT's target is the base's <em>own</em> demo-informed belief, so the student barely moves — it gains the task while <b>keeping</b> its general ability. That trade, not peak score, is SDFT's point.";
+  }
+  r.addEventListener("input",draw);onView(cv,draw);draw();new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
 });
 
 })();
