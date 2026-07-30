@@ -1035,6 +1035,34 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
     uses Monte Carlo returns with <b>γ = 0.97</b>, updates a tabular value baseline, and applies the
     log-softmax policy-gradient direction. Random sampling means an individual run can improve or regress.</figcaption>
   </figure>
+  <details class="deep"><summary>Go deeper: how this playground is implemented</summary><div class="dbody">
+    <p>The demo is deliberately small enough to inspect. It is a <b>tabular</b> agent: each of the grid's
+    25 cells stores four numbers called <em>logits</em>, one for each movement direction, plus one value
+    estimate. Applying softmax to a cell's logits produces its action probabilities
+    <math><mi>π</mi><mo>(</mo><mi>a</mi><mo>|</mo><mi>s</mi><mo>)</mo></math>. Every new table starts with
+    zero logits, so all four actions initially have probability 0.25.</p>
+    <p><b>1 · Collect an episode.</b> At each cell, JavaScript samples an action from that distribution,
+    applies the grid's transition rules, and records
+    <code>{state, action, reward, next_state, probabilities}</code>. The manual arrow buttons call the same
+    transition function. An episode ends at the goal, a penalty tile, or the 24-step limit.</p>
+    <p><b>2 · Work backwards.</b> Once the episode ends, the code scans its rewards from last to first:
+    <math display="block"><mrow><msub><mi>G</mi><mi>t</mi></msub><mo>=</mo><msub><mi>r</mi><mi>t</mi></msub><mo>+</mo><mi>γ</mi><msub><mi>G</mi><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>,</mo><mspace width=".8em"/><msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub><mo>=</mo><msub><mi>G</mi><mi>t</mi></msub><mo>−</mo><mi>V</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo></mrow></math>
+    The return assigns later consequences to earlier actions. Subtracting the learned baseline asks whether
+    this particular result was better or worse than the agent expected from that cell.</p>
+    <p><b>3 · Update policy and value.</b> For the selected action, the policy uses the log-softmax gradient:
+    <math display="block"><mrow><msub><mi>z</mi><mi>b</mi></msub><mo>←</mo><msub><mi>z</mi><mi>b</mi></msub><mo>+</mo><mi>α</mi><mover><mi>A</mi><mo>^</mo></mover><mo>(</mo><mn>1</mn><mo>[</mo><mi>b</mi><mo>=</mo><mi>a</mi><mo>]</mo><mo>−</mo><mi>π</mi><mo>(</mo><mi>b</mi><mo>|</mo><mi>s</mi><mo>)</mo><mo>)</mo></mrow></math>
+    A positive advantage raises the chosen action's probability; a negative one lowers it. The value table
+    separately moves toward the observed return. “Train 50 episodes” simply repeats collection and update
+    50 times, so it is still the same loop rather than a hidden shortcut.</p>
+    <p><b>4 · Draw the internals.</b> A 400 × 400 HTML Canvas renders the pixel grid. The path overlay draws
+    recorded transitions, the policy overlay draws each cell's most probable action, and the value overlay
+    colors the learned <math><mi>V</mi><mo>(</mo><mi>s</mi><mo>)</mo></math> table. The inspector reads the
+    selected transition directly, including its probability before and after an update.</p>
+    <p>Everything runs as inline HTML, CSS, and vanilla JavaScript, with no server computation or external
+    package. That makes it suitable for GitHub Pages. It demonstrates the policy-gradient mechanism, but it
+    is not PPO or GRPO: those methods train a neural language model and add machinery such as probability
+    ratios, clipping or constraints, and different ways to construct the advantage.</p>
+  </div></details>
   <div class="tbl"><table>
     <thead><tr><th>Gridworld concept</th><th>Language-model analogue</th></tr></thead>
     <tbody>
