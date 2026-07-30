@@ -84,6 +84,7 @@ figcaption b{color:var(--ink-2);font-weight:600}
 .btn:hover{border-color:var(--accent);color:var(--accent-ink)}
 .btn.pri{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn.pri:hover{filter:brightness(1.06);color:#fff}
+.btn:disabled{cursor:not-allowed;opacity:.45;filter:none}
 .btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
 input[type=range]{accent-color:var(--accent);width:100%}
 .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
@@ -457,16 +458,22 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
   attention remains linear in the current context length per decode step.
   <a class="cite" href="https://huggingface.co/docs/transformers/cache_explanation" target="_blank" rel="noreferrer">HF cache docs</a></p>
   <figure class="fig reveal" id="fig-kv">
-    <div class="fig-title">kv-cache · reuse prefix projections, still scan cached keys</div>
+    <div class="fig-title">kv-cache · what is reused, and what still grows</div>
     <div class="controls">
       <button class="btn" id="kv-prefill">Prefill 4 tokens</button>
-      <button class="btn pri" id="kv-add">+ generate 1</button>
+      <button class="btn pri" id="kv-add" disabled>Decode one token</button>
       <button class="btn" id="kv-reset">reset</button>
     </div>
-    <svg id="kv-svg" width="520" height="92" viewBox="0 0 520 92" role="img" aria-label="growing kv cache"></svg>
-    <figcaption id="kv-cap">Cache empty. Prefill runs the prompt once; each generated token then appends a
-    single K/V column. At prefix length <b>T</b>, projecting the new K/V is constant-size, while scoring
-    and mixing over the cached prefix is <b>O(T)</b> per layer.</figcaption>
+    <svg id="kv-svg" width="620" height="286" viewBox="0 0 620 286"
+      role="img" aria-label="decode comparison with and without a KV cache"></svg>
+    <div class="stats">
+      <div class="stat"><div class="k">phase</div><div class="v" id="kv-phase">waiting</div></div>
+      <div class="stat"><div class="k">projected · no / cache</div><div class="v" id="kv-project">—</div></div>
+      <div class="stat"><div class="k">old K/V reused</div><div class="v" id="kv-reuse">—</div></div>
+      <div class="stat accent"><div class="k">new query scans</div><div class="v" id="kv-scan">—</div></div>
+    </div>
+    <figcaption id="kv-cap" aria-live="polite">Prefill the prompt first. Both paths process the prompt once;
+    the difference appears when decoding begins.</figcaption>
   </figure>
 
   <h3 id="s25">The attention-variants landscape</h3>
@@ -1440,12 +1447,110 @@ W(function(){
 
 /* ---------- KV CACHE STEPPER ---------- */
 W(function(){
-  var svg=document.getElementById("kv-svg"),cap=document.getElementById("kv-cap"),n=0,x0=14,cw=20,gap=4,y=20,h=34;
-  function draw(newIdx){svg.innerHTML="";for(var i=0;i<n;i++){var isNew=i===newIdx;svg.appendChild(el("rect",{x:x0+i*(cw+gap),y:y,width:cw,height:h,rx:4,fill:isNew?css("--accent"):css("--accent-soft"),stroke:css("--accent"),"stroke-width":1.2}));}svg.appendChild(txt(x0,y+h+22,11,css("--muted"),"start",css("--mono"))).textContent="cached K/V length = "+n;}
-  document.getElementById("kv-prefill").addEventListener("click",function(){n=4;draw(-1);cap.innerHTML="Prefill: the 4 prompt tokens are encoded once, filling the cache.";});
-  document.getElementById("kv-add").addEventListener("click",function(){if(n===0)n=4;n++;draw(n-1);cap.innerHTML="Generated 1 token (dark): only its K/V projections are new, but its query scores all <b>"+(n-1)+" cached keys</b> — attention work grows with prefix length.";});
-  document.getElementById("kv-reset").addEventListener("click",function(){n=0;draw(-1);cap.textContent="Cache empty. Prefill runs the prompt once; each generated token then appends a single column.";});
-  draw(-1);
+  var svg=document.getElementById("kv-svg"),cap=document.getElementById("kv-cap"),
+      prefill=document.getElementById("kv-prefill"),add=document.getElementById("kv-add"),
+      reset=document.getElementById("kv-reset"),phaseOut=document.getElementById("kv-phase"),
+      projectOut=document.getElementById("kv-project"),reuseOut=document.getElementById("kv-reuse"),
+      scanOut=document.getElementById("kv-scan"),n=0,phase="empty",prompt=4,maxTokens=8;
+  function label(x,y,s,text,color,anchor,weight){
+    var t=txt(x,y,s,css(color||"--muted"),anchor||"start",css("--sans"),weight||"");
+    t.textContent=text;svg.appendChild(t);return t;
+  }
+  function arrow(x1,y1,x2,y2,color){
+    color=css(color||"--line-2");
+    svg.appendChild(el("line",{x1:x1,y1:y1,x2:x2,y2:y2-6,stroke:color,"stroke-width":1.3}));
+    svg.appendChild(el("path",{d:"M "+(x2-4)+" "+(y2-7)+" L "+x2+" "+y2+" L "+(x2+4)+" "+(y2-7)+" Z",fill:color}));
+  }
+  function positions(x){
+    var out=[],gap=5,w=27,start=x+23;
+    for(var i=0;i<n;i++)out.push({x:start+i*(w+gap),w:w});
+    return out;
+  }
+  function drawLane(x,title,cached){
+    var laneW=286,pos=positions(x),decode=phase==="decode";
+    svg.appendChild(el("rect",{x:x,y:35,width:laneW,height:236,rx:8,fill:css("--ground"),stroke:css("--line")}));
+    label(x+laneW/2,22,11,title,cached?"--good":"--amber","middle","680");
+    if(!n){
+      label(x+laneW/2,143,11,"Prefill prompt to begin","--muted","middle","600");
+      return;
+    }
+    label(x+18,57,8.5,"TOKEN POSITIONS","--muted","start","640");
+    pos.forEach(function(p,i){
+      var isNew=decode&&i===n-1;
+      svg.appendChild(el("rect",{x:p.x,y:67,width:p.w,height:25,rx:4,
+        fill:css(isNew?"--accent":i<prompt?"--panel-2":"--accent-soft"),
+        stroke:css(isNew?"--accent":"--line-2"),"stroke-width":1}));
+      label(p.x+p.w/2,84,8,String(i),isNew?"--ground":"--ink-2","middle","640");
+    });
+    label(x+18,113,8.5,cached?"K/V BANK":"K/V PROJECTIONS THIS STEP","--muted","start","640");
+    pos.forEach(function(p,i){
+      var isNew=decode&&i===n-1,old=decode&&i<n-1;
+      var fill=cached?(isNew?"--accent":old?"--img-soft":"--panel-2"):(decode?"--amber-soft":"--panel-2");
+      var stroke=cached?(isNew?"--accent":old?"--img":"--line-2"):(decode?"--amber":"--line-2");
+      if(!cached||isNew||phase==="prefill")arrow(p.x+p.w/2,94,p.x+p.w/2,129,cached?"--accent":"--amber");
+      svg.appendChild(el("rect",{x:p.x,y:132,width:p.w,height:28,rx:4,fill:css(fill),stroke:css(stroke),"stroke-width":1.1}));
+      label(p.x+p.w/2,150,7.5,"K/V",isNew?"--ground":"--ink-2","middle","640");
+    });
+    if(decode){
+      label(x+laneW/2,181,8.5,cached?"ONE NEW QUERY → ALL KEYS":"FULL CAUSAL ATTENTION RERUN","--muted","middle","640");
+      if(cached){
+        var qx=pos[n-1].x+pos[n-1].w/2,qy=199;
+        pos.forEach(function(p){
+          svg.appendChild(el("line",{x1:qx,y1:qy,x2:p.x+p.w/2,y2:239,stroke:css("--img"),"stroke-width":1.2,opacity:.68}));
+        });
+        svg.appendChild(el("circle",{cx:qx,cy:qy,r:11,fill:css("--accent"),stroke:css("--accent")}));
+        label(qx,qy+3,8,"Q","--ground","middle","680");
+        pos.forEach(function(p){
+          svg.appendChild(el("rect",{x:p.x,y:238,width:p.w,height:16,rx:3,fill:css("--img-soft"),stroke:css("--img")}));
+        });
+      }else{
+        var cell=8,mx=x+106,my=193;
+        for(var r=0;r<n;r++)for(var c=0;c<=r;c++){
+          svg.appendChild(el("rect",{x:mx+c*(cell+2),y:my+r*(cell+2),width:cell,height:cell,rx:1,
+            fill:css(r===n-1?"--amber":"--panel-2"),stroke:"none",opacity:r===n-1?1:.9}));
+        }
+        label(mx-8,my+5,7.5,"Q","--muted","end","640");
+        label(mx+n*(cell+2)/2,my-6,7.5,"K →","--muted","middle","640");
+      }
+    }else{
+      label(x+laneW/2,205,9,cached?"prompt K/V stored for later reuse":"same one-time prompt computation","--muted","middle","600");
+    }
+  }
+  function update(){
+    svg.innerHTML="";
+    drawLane(10,"WITHOUT CACHE",false);
+    drawLane(324,"WITH KV CACHE",true);
+    if(phase==="empty"){
+      phaseOut.textContent="waiting";projectOut.textContent="—";reuseOut.textContent="—";scanOut.textContent="—";
+    }else if(phase==="prefill"){
+      phaseOut.textContent="prefill";projectOut.textContent=prompt+" / "+prompt;reuseOut.textContent="0";scanOut.textContent="prompt pass";
+    }else{
+      phaseOut.textContent="decode";projectOut.textContent=n+" / 1";reuseOut.textContent=String(n-1);scanOut.textContent=n+" keys";
+    }
+    add.disabled=phase==="empty"||n>=maxTokens;
+    add.textContent=n>=maxTokens?"Example complete":"Decode one token";
+    prefill.disabled=phase!=="empty";
+  }
+  prefill.addEventListener("click",function(){
+    n=prompt;phase="prefill";
+    cap.innerHTML="Prefill processes all <b>"+prompt+" prompt positions once</b> and stores one K/V pair per position, per layer. The cache begins saving work on the next decode step.";
+    update();
+  });
+  add.addEventListener("click",function(){
+    if(phase==="empty"||n>=maxTokens)return;
+    n++;phase="decode";
+    var full=n*(n+1)/2;
+    cap.innerHTML="At length <b>"+n+"</b>, a naïve uncached pass reprojects all "+n+" positions and recomputes <b>"+full+" causal score pairs per layer</b>. The cached path projects one new position, reuses "+(n-1)+" old K/V pairs, and the new query still scores <b>all "+n+" keys</b>, including its own."+
+      (n>=maxTokens?" The diagram stops at eight positions for readability; a real cache continues growing.":"");
+    update();
+  });
+  reset.addEventListener("click",function(){
+    n=0;phase="empty";
+    cap.textContent="Prefill the prompt first. Both paths process the prompt once; the difference appears when decoding begins.";
+    update();
+  });
+  onView(svg,update);update();
+  new MutationObserver(update).observe(root,{attributes:true,attributeFilter:["data-theme"]});
 });
 
 /* ---------- PIXEL SHUFFLE ---------- */
