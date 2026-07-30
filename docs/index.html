@@ -89,6 +89,8 @@ input[type=range]{accent-color:var(--accent);width:100%}
 .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden}
 .seg button{font-family:var(--sans);font-size:.8rem;border:none;background:var(--ground);color:var(--ink-2);padding:.36rem .7rem;cursor:pointer}
 .seg button.on{background:var(--accent);color:#fff}
+#vit-arch-seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+#vit-arch-seg button{min-width:0;padding:.42rem .28rem;white-space:normal;line-height:1.2}
 .hint{font-family:var(--sans);font-size:.78rem;color:var(--muted)}
 .sliderrow{display:flex;align-items:center;gap:.7rem;font-family:var(--sans);font-size:.8rem;color:var(--ink-2)}
 .sliderrow input{flex:1}
@@ -142,6 +144,20 @@ details.deep[open]>summary::before{transform:rotate(90deg)}
 details.deep>summary:hover{color:var(--accent)}
 details.deep .dbody{padding:0 0 1rem;font-size:.96rem}
 details.deep .dbody>*:first-child{margin-top:0}
+details.intuition{border:1px solid var(--line);border-left:3px solid var(--good);border-radius:0 10px 10px 0;background:color-mix(in srgb,var(--good-soft) 38%,var(--ground));margin:1.2rem 0;padding:0 1rem}
+details.intuition>summary{font-family:var(--sans);font-size:.86rem;font-weight:600;color:var(--good);cursor:pointer;padding:.7rem 0;list-style:none;display:flex;align-items:center;gap:.5rem}
+details.intuition>summary::-webkit-details-marker{display:none}
+details.intuition>summary::before{content:"▸";display:inline-block;transition:transform .2s;color:var(--good)}
+details.intuition[open]>summary::before{transform:rotate(90deg)}
+details.intuition .ibody{padding:0 0 1rem;font-size:.96rem}
+details.intuition .ibody>*:first-child{margin-top:0}
+.intuition-points{display:grid;grid-template-columns:1fr 1fr;gap:0 1.2rem;margin-top:1rem}
+.intuition-point{border-top:1px solid color-mix(in srgb,var(--good) 28%,var(--line));padding:.7rem 0}
+.intuition-point b{display:block;font-family:var(--sans);font-size:.82rem;color:var(--ink);margin-bottom:.18rem}
+.intuition-point p{font-size:.88rem;line-height:1.5;color:var(--ink-2);margin:0}
+#vit-pos-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+#vit-pos-seg button{min-width:0;padding:.42rem .3rem;white-space:normal;line-height:1.2}
+@media(max-width:560px){.intuition-points{grid-template-columns:1fr}}
 .callout{border:1px solid var(--line);border-left:3px solid var(--amber);background:color-mix(in srgb,var(--amber-soft) 45%,var(--ground));border-radius:0 10px 10px 0;padding:.8rem 1rem;margin:1.3rem 0;font-size:.95rem}
 .callout .ct{font-family:var(--sans);font-size:.72rem;font-weight:640;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);margin-bottom:.3rem}
 .take{border:1px solid var(--line);border-left:3px solid var(--good);background:color-mix(in srgb,var(--good-soft) 40%,var(--ground));border-radius:0 10px 10px 0;padding:.8rem 1rem;margin:1.3rem 0;font-size:.95rem}
@@ -515,6 +531,56 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
     <math><mrow><mo>(</mo><mn>256</mn><mo>/</mo><mn>16</mn><msup><mo>)</mo><mn>2</mn></msup><mo>=</mo><mn>256</mn></mrow></math>
     patches — the ViT's "tokens".</figcaption>
   </figure>
+
+  <figure class="fig reveal" id="fig-vit-arch">
+    <div class="fig-title">vit architecture · from patches to contextual visual tokens</div>
+    <div class="controls">
+      <div class="seg" id="vit-arch-seg" aria-label="Vision Transformer stage">
+        <button class="on" data-stage="0">Patchify</button>
+        <button data-stage="1">+ position</button>
+        <button data-stage="2">Attention</button>
+        <button data-stage="3">MLP + residual</button>
+      </div>
+    </div>
+    <svg id="vit-arch-svg" width="620" height="270" viewBox="0 0 620 270"
+      role="img" aria-label="interactive Vision Transformer architecture stages"></svg>
+    <div class="stats">
+      <div class="stat"><div class="k">tokens</div><div class="v">256</div></div>
+      <div class="stat"><div class="k">width</div><div class="v">768</div></div>
+      <div class="stat accent"><div class="k">mixes patches?</div><div class="v" id="vit-arch-mix">no</div></div>
+    </div>
+    <figcaption id="vit-arch-cap">A stride-16 convolution maps each non-overlapping 16×16 RGB patch
+    directly to one 768-dimensional token. The diagram shows a 4×4 excerpt of the full 16×16 grid.</figcaption>
+  </figure>
+
+  <details class="intuition" open><summary>Build intuition: how a ViT constructs a scene</summary><div class="ibody">
+    <p>A ViT starts with local measurements, not ready-made objects. Each patch projection describes a small
+    region's pixels; repeated attention and MLP updates turn those local descriptions into
+    <em>contextual</em> visual tokens.</p>
+    <div class="controls">
+      <div class="seg" id="vit-pos-seg" aria-label="Patch content and position relationship">
+        <button class="on" data-mode="aligned">Aligned</button>
+        <button data-mode="content">Move content</button>
+        <button data-mode="pair">Move content + address</button>
+      </div>
+    </div>
+    <svg id="vit-pos-svg" width="620" height="278" viewBox="0 0 620 278"
+      role="img" aria-label="patch content and positional address intuition"></svg>
+    <p class="hint" id="vit-pos-cap">Each content vector cᵢ is paired with the learned address pᵢ for the
+    location where that patch appears.</p>
+    <div class="intuition-points">
+      <div class="intuition-point"><b>A patch is a token, not an object</b><p>The first embedding is a learned
+      description of local pixels. Object-level evidence has to be assembled across patches and layers.</p></div>
+      <div class="intuition-point"><b>Position is an address</b><p>Content says what the patch contains;
+      the added position vector says where it is. Attention receives their sum.</p></div>
+      <div class="intuition-point"><b>Attention communicates; the MLP interprets</b><p>Attention combines
+      evidence across locations. The MLP transforms each token independently, and the residual preserves
+      what was already known.</p></div>
+      <div class="intuition-point"><b>Global reach is not instant understanding</b><p>One bidirectional layer
+      can consult the whole image, but useful scene structure emerges through repeated updates. This is a
+      conceptual account, not a claim that a fixed layer always detects a particular feature.</p></div>
+    </div>
+  </div></details>
 
   <h3 id="s3cmp">Same skeleton, different dialect</h3>
   <p>The vision and language towers share the transformer skeleton but differ in nearly every detail —
@@ -1405,6 +1471,229 @@ W(function(){
     svg.parentNode.addEventListener("mouseleave",function(){hl.setAttribute("opacity",0);});
   }
   if(img.complete)draw(); else img.addEventListener("load",draw);
+});
+
+/* ---------- VIT ARCHITECTURE EXPLORER ---------- */
+W(function(){
+  var svg=document.getElementById("vit-arch-svg"),seg=document.getElementById("vit-arch-seg"),
+      cap=document.getElementById("vit-arch-cap"),mix=document.getElementById("vit-arch-mix");
+  if(!svg||!seg)return;
+  var stage=0,selected=6,pal=["--img","--accent","--good","--amber"];
+  function label(x,y,s,text,color,anchor,weight){
+    var t=txt(x,y,s,css(color||"--muted"),anchor||"start",css("--sans"),weight||"");
+    t.textContent=text;svg.appendChild(t);return t;
+  }
+  function arrow(x1,y1,x2,y2,color){
+    color=css(color||"--line-2");
+    svg.appendChild(el("line",{x1:x1,y1:y1,x2:x2-8,y2:y2,stroke:color,"stroke-width":1.8}));
+    svg.appendChild(el("path",{d:"M "+(x2-9)+" "+(y2-5)+" L "+x2+" "+y2+" L "+(x2-9)+" "+(y2+5)+" Z",fill:color}));
+  }
+  function patchGrid(x,y,cs,gap,mode){
+    for(var r=0;r<4;r++)for(var c=0;c<4;c++){
+      var i=r*4+c,fill=css(pal[(r+c)%pal.length]),opacity=.26+(i%4)*.1;
+      if(mode==="position"){fill=css(pal[(r*2+c)%pal.length]);opacity=.32+(r+c)*.06;}
+      var rect=el("rect",{x:x+c*(cs+gap),y:y+r*(cs+gap),width:cs,height:cs,rx:4,
+        fill:fill,opacity:opacity,stroke:mode==="query"&&i===selected?css("--accent"):css("--line-2"),
+        "stroke-width":mode==="query"&&i===selected?3:1});
+      svg.appendChild(rect);
+      if(mode==="position")label(x+c*(cs+gap)+cs/2,y+r*(cs+gap)+cs/2+3,8,"p"+i,"--ink-2","middle","600");
+    }
+  }
+  function tokenGrid(x,y,cs,gap,withPos){
+    for(var r=0;r<4;r++)for(var c=0;c<4;c++){
+      var i=r*4+c,xx=x+c*(cs+gap),yy=y+r*(cs+gap);
+      svg.appendChild(el("rect",{x:xx,y:yy,width:cs,height:cs,rx:4,fill:css("--panel-2"),
+        stroke:css(withPos?pal[(r*2+c)%pal.length]:"--line-2"),"stroke-width":withPos?2:1.2}));
+      svg.appendChild(el("line",{x1:xx+5,y1:yy+cs*.38,x2:xx+cs-5,y2:yy+cs*.38,stroke:css("--muted"),"stroke-width":1,opacity:.65}));
+      svg.appendChild(el("line",{x1:xx+5,y1:yy+cs*.62,x2:xx+cs-8,y2:yy+cs*.62,stroke:css("--muted"),"stroke-width":1,opacity:.45}));
+      if(withPos)label(xx+cs-3,yy+8,7,String(i),"--accent-ink","end","600");
+    }
+  }
+  function drawPatchify(){
+    label(24,25,10,"IMAGE PATCHES","--muted","start","640");
+    label(398,25,10,"PATCH TOKENS","--muted","start","640");
+    patchGrid(34,48,29,4,"image");
+    label(97,199,10,"4×4 excerpt","--muted","middle");
+    arrow(184,112,350,112,"--accent");
+    label(267,94,10,"Conv2d","--accent-ink","middle","640");
+    label(267,130,9,"kernel 16 · stride 16","--muted","middle");
+    tokenGrid(382,48,25,7,false);
+    label(446,199,10,"each tile → 768 numbers","--muted","middle");
+    svg.appendChild(el("rect",{x:522,y:74,width:76,height:72,rx:6,fill:css("--ground"),stroke:css("--line-2")}));
+    label(560,94,9,"FULL GRID","--muted","middle","640");
+    label(560,119,20,"16×16","--ink","middle","640");
+    label(560,137,9,"= 256 tokens","--muted","middle");
+  }
+  function drawPosition(){
+    label(27,25,10,"PATCH TOKENS","--muted","start","640");
+    label(241,25,10,"LEARNED POSITION TABLE","--muted","start","640");
+    label(478,25,10,"POSITION-AWARE TOKENS","--muted","start","640");
+    tokenGrid(36,53,24,6,false);
+    label(178,122,24,"+","--accent-ink","middle","640");
+    patchGrid(226,53,24,6,"position");
+    arrow(365,113,437,113,"--accent");
+    tokenGrid(463,53,24,6,true);
+    label(110,205,9,"content xᵢ","--muted","middle");
+    label(300,205,9,"one trained pᵢ per index","--muted","middle");
+    label(537,205,9,"xᵢ + pᵢ · same [256,768] shape","--muted","middle");
+  }
+  function drawAttention(){
+    var gx=218,gy=48,cs=34,gap=6;
+    label(24,27,10,"12-HEAD SELF-ATTENTION","--muted","start","640");
+    svg.appendChild(el("rect",{x:25,y:68,width:116,height:94,rx:6,fill:css("--ground"),stroke:css("--line-2")}));
+    label(83,88,9,"SELECTED PATCH","--muted","middle","640");
+    label(83,116,18,"q"+selected,"--accent-ink","middle","640");
+    label(83,139,9,"scores every kⱼ","--muted","middle");
+    arrow(145,116,202,116,"--accent");
+    var sr=Math.floor(selected/4),sc=selected%4,sx=gx+sc*(cs+gap)+cs/2,sy=gy+sr*(cs+gap)+cs/2;
+    for(var r=0;r<4;r++)for(var c=0;c<4;c++){
+      var dx=c-sc,dy=r-sr,w=.16+.72/(1+Math.abs(dx)+Math.abs(dy));
+      svg.appendChild(el("line",{x1:sx,y1:sy,x2:gx+c*(cs+gap)+cs/2,y2:gy+r*(cs+gap)+cs/2,
+        stroke:css((r*4+c)===selected?"--accent":"--img"),"stroke-width":(r*4+c)===selected?2.6:1.5,opacity:w}));
+    }
+    patchGrid(gx,gy,cs,gap,"query");
+    arrow(384,116,438,116,"--accent");
+    svg.appendChild(el("rect",{x:448,y:62,width:145,height:108,rx:6,fill:css("--ground"),stroke:css("--line-2")}));
+    label(520,84,9,"WEIGHTED VALUE MIX","--muted","middle","640");
+    for(var i=0;i<5;i++){
+      svg.appendChild(el("rect",{x:470,y:98+i*11,width:98-i*8,height:6,rx:3,fill:css(pal[i%4]),opacity:.35+i*.11}));
+    }
+    label(520,160,9,"+ residual → contextual z"+selected,"--ink-2","middle","600");
+    label(300,230,10,"Every patch can read every other patch · 16 shown of 256","--muted","middle");
+  }
+  function drawMlp(){
+    label(24,24,10,"PER-TOKEN FEED-FORWARD + RESIDUAL","--muted","start","640");
+    for(var i=0;i<4;i++){
+      var y=48+i*46,col=pal[i];
+      svg.appendChild(el("rect",{x:24,y:y,width:48,height:27,rx:5,fill:css(col),opacity:.35,stroke:css(col)}));
+      label(48,y+18,9,"z"+i,"--ink","middle","640");
+      arrow(76,y+13,116,y+13,"--line-2");
+      svg.appendChild(el("rect",{x:122,y:y,width:54,height:27,rx:5,fill:css("--ground"),stroke:css("--line-2")}));
+      label(149,y+18,8,"LayerNorm","--muted","middle");
+      arrow(180,y+13,216,y+13,"--line-2");
+      svg.appendChild(el("rect",{x:222,y:y,width:112,height:27,rx:5,fill:css("--accent-soft"),stroke:css("--accent")}));
+      label(278,y+18,8.5,"MLP 768→3072→768","--accent-ink","middle","600");
+      arrow(338,y+13,373,y+13,"--line-2");
+      label(386,y+18,18,"+","--good","middle","640");
+      svg.appendChild(el("path",{d:"M 48 "+(y+29)+" L 48 "+(y+37)+" L 386 "+(y+37)+" L 386 "+(y+27),fill:"none",stroke:css("--good"),"stroke-width":1.3,"stroke-dasharray":"4 3"}));
+      arrow(397,y+13,431,y+13,"--good");
+      svg.appendChild(el("rect",{x:438,y:y,width:48,height:27,rx:5,fill:css(col),opacity:.5,stroke:css(col)}));
+      label(462,y+18,9,"z′"+i,"--ink","middle","640");
+    }
+    arrow(498,117,536,117,"--accent");
+    svg.appendChild(el("rect",{x:542,y:69,width:57,height:96,rx:6,fill:css("--ground"),stroke:css("--accent"),"stroke-width":1.5}));
+    label(570,91,9,"REPEAT","--muted","middle","640");
+    label(570,122,21,"×12","--accent-ink","middle","640");
+    label(570,146,8,"ViT blocks","--muted","middle");
+    label(255,245,10,"The same MLP is applied independently to every patch token; no new spatial mixing here.","--muted","middle");
+  }
+  var captions=[
+    "A stride-16 convolution maps each non-overlapping 16×16 RGB patch directly to one 768-dimensional token. The diagram shows a 4×4 excerpt of the full 16×16 grid.",
+    "A learned 768-dimensional vector is added at each of the 256 patch indices. Content and position now share one vector, and the sequence shape stays [256, 768].",
+    "Each patch forms a query and can attend to keys from every patch because the ViT is bidirectional. This is the only sub-layer that mixes information across image locations.",
+    "LayerNorm and the GELU MLP transform each contextual patch independently, then a residual adds the input back. Attention and MLP sub-layers repeat for 12 ViT blocks."
+  ];
+  function draw(){
+    svg.innerHTML="";
+    if(stage===0)drawPatchify();
+    else if(stage===1)drawPosition();
+    else if(stage===2)drawAttention();
+    else drawMlp();
+    mix.textContent=stage===2?"yes":"no";
+    mix.style.color=stage===2?css("--good"):css("--muted");
+    cap.textContent=captions[stage];
+  }
+  [].forEach.call(seg.querySelectorAll("button"),function(btn){
+    btn.setAttribute("aria-pressed",btn.classList.contains("on"));
+    btn.addEventListener("click",function(){
+      stage=+btn.getAttribute("data-stage");
+      [].forEach.call(seg.querySelectorAll("button"),function(b){var on=b===btn;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);});
+      draw();
+    });
+  });
+  svg.addEventListener("pointermove",function(e){
+    if(stage!==2)return;
+    var box=svg.getBoundingClientRect(),x=(e.clientX-box.left)/box.width*620,y=(e.clientY-box.top)/box.height*270;
+    var gx=218,gy=48,step=40,c=Math.floor((x-gx)/step),r=Math.floor((y-gy)/step);
+    if(c>=0&&c<4&&r>=0&&r<4&&x<=gx+c*step+34&&y<=gy+r*step+34){
+      var next=r*4+c;if(next!==selected){selected=next;draw();}
+    }
+  });
+  onView(svg,draw);draw();
+  new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+});
+
+/* ---------- VIT POSITION INTUITION ---------- */
+W(function(){
+  var svg=document.getElementById("vit-pos-svg"),seg=document.getElementById("vit-pos-seg"),
+      cap=document.getElementById("vit-pos-cap");
+  if(!svg||!seg)return;
+  var mode="aligned",selected=5,perm=[10,3,12,5,15,0,8,2,14,7,1,11,4,13,6,9],
+      pal=["--img","--accent","--good","--amber"];
+  function label(x,y,s,text,color,anchor,weight){
+    var t=txt(x,y,s,css(color||"--muted"),anchor||"start",css("--sans"),weight||"");
+    t.textContent=text;svg.appendChild(t);return t;
+  }
+  function tokenAt(slot){
+    if(mode==="aligned")return {content:slot,address:slot};
+    if(mode==="content")return {content:perm[slot],address:slot};
+    return {content:perm[slot],address:perm[slot]};
+  }
+  function draw(){
+    svg.innerHTML="";
+    label(24,24,10,"16 PATCH TOKENS · CONCEPTUAL 4×4 GRID","--muted","start","640");
+    var gx=30,gy=45,cs=43,gap=7;
+    for(var r=0;r<4;r++)for(var c=0;c<4;c++){
+      (function(slot){
+        var token=tokenAt(slot),x=gx+c*(cs+gap),y=gy+r*(cs+gap),col=pal[token.content%pal.length],
+            active=slot===selected;
+        var g=el("g",{"data-slot":slot});
+        g.appendChild(el("rect",{x:x,y:y,width:cs,height:cs,rx:5,fill:css(col),opacity:.22+(token.content%4)*.1,
+          stroke:active?css("--good"):css("--line-2"),"stroke-width":active?3:1}));
+        var stripe=6+(token.content%5)*4;
+        g.appendChild(el("line",{x1:x+7,y1:y+stripe,x2:x+cs-7,y2:y+stripe,
+          stroke:css(col),"stroke-width":2,opacity:.85}));
+        var ct=txt(x+7,y+16,9,css("--ink"),"start",css("--mono"),"640");ct.textContent="c"+token.content;g.appendChild(ct);
+        g.appendChild(el("rect",{x:x+20,y:y+25,width:19,height:14,rx:3,fill:css("--ground"),stroke:css("--line")}));
+        var pt=txt(x+29.5,y+35,7.5,css("--accent-ink"),"middle",css("--mono"),"640");pt.textContent="p"+token.address;g.appendChild(pt);
+        g.addEventListener("pointerenter",function(){if(selected!==slot){selected=slot;draw();}});
+        svg.appendChild(g);
+      })(r*4+c);
+    }
+    label(127,263,9,"tile motif = content cᵢ · corner badge = address pᵢ","--muted","middle");
+
+    var token=tokenAt(selected),matched=token.content===token.address;
+    svg.appendChild(el("line",{x1:253,y1:138,x2:310,y2:138,stroke:css("--line-2"),"stroke-width":1.8}));
+    svg.appendChild(el("path",{d:"M 301 133 L 310 138 L 301 143 Z",fill:css("--line-2")}));
+    svg.appendChild(el("rect",{x:326,y:49,width:267,height:178,rx:8,fill:css("--ground"),stroke:css("--line-2")}));
+    label(348,74,9,"TOKEN IN DISPLAY SLOT "+selected,"--muted","start","640");
+    label(348,107,15,"content c"+token.content,"--ink","start","640");
+    label(458,107,17,"+","--muted","middle","640");
+    label(486,107,15,"address p"+token.address,"--accent-ink","start","640");
+    svg.appendChild(el("line",{x1:348,y1:122,x2:570,y2:122,stroke:css("--line")}));
+    label(348,149,10,"ENCODED CLAIM","--muted","start","640");
+    var claim=mode==="content"?"content c"+token.content+" is now at location "+token.address:
+      "content c"+token.content+" came from location "+token.address;
+    label(348,174,12,claim,matched?"--good":"--amber","start","640");
+    label(348,200,9,matched?"source address preserved":"geometry has changed","--muted","start","600");
+  }
+  var captions={
+    aligned:"Each content vector cᵢ is paired with the learned address pᵢ for the location where that patch appears.",
+    content:"Moving only the content changes the image's geometry: the patch now receives the address of its new location. Content alone does not retain its old coordinates.",
+    pair:"When content and address travel together, attention can still identify the patch's source location even if the display order changes. Production ViTs keep canonical order because later grid-shaped operations may depend on it."
+  };
+  [].forEach.call(seg.querySelectorAll("button"),function(btn){
+    btn.setAttribute("aria-pressed",btn.classList.contains("on"));
+    btn.addEventListener("click",function(){
+      mode=btn.getAttribute("data-mode");
+      [].forEach.call(seg.querySelectorAll("button"),function(b){
+        var on=b===btn;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);
+      });
+      cap.textContent=captions[mode];draw();
+    });
+  });
+  onView(svg,draw);draw();
+  new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
 });
 
 /* ---------- RESOLUTION → TOKENS ---------- */
