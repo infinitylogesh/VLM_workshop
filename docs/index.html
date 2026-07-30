@@ -229,12 +229,18 @@ details.intuition .ibody>*:first-child{margin-top:0}
 kbd,.kbd{font-family:var(--mono);background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:.02em .38em;font-size:.82em}
 footer{margin:4rem 0 3rem;padding-top:1.6rem;border-top:1px solid var(--line);color:var(--muted);font-family:var(--sans);font-size:.85rem}
 footer a{color:var(--accent-ink)}
-#block-svg{flex:0 0 auto;max-width:100%;overflow:visible}
+#block-layout{display:grid;grid-template-columns:minmax(280px,360px) minmax(230px,1fr);gap:1.1rem;align-items:start;margin-top:.7rem}
+#block-svg{width:100%;max-width:360px;overflow:visible}
 #block-svg .blk-g{cursor:pointer;transition:opacity .15s}
 #block-svg .blk-g rect:first-of-type,#block-svg .blk-g circle{transition:stroke .18s,stroke-width .18s}
 #block-svg .blk-g:hover rect:first-of-type,#block-svg .blk-g:hover circle{stroke:var(--accent)}
 #block-svg .blk-g.on rect:first-of-type,#block-svg .blk-g.on circle{stroke:var(--accent);stroke-width:2.4}
 #block-svg .blk-g.on rect:first-of-type{filter:drop-shadow(0 0 4px var(--accent-soft))}
+#block-svg .blk-g:focus-visible{outline:none}
+#block-svg .blk-g:focus-visible rect:first-of-type,#block-svg .blk-g:focus-visible circle{stroke:var(--accent);stroke-width:3}
+#block-svg .blk-branch{transition:stroke .2s,opacity .2s}
+#block-svg .blk-branch.active{stroke:var(--accent);opacity:1}
+#block-svg .flow-dot{transition:cx .45s ease,cy .45s ease,opacity .18s}
 #block-svg text{-webkit-user-select:none;user-select:none}
 #block-desc{flex:1;min-width:230px;background:var(--ground);border:1px solid var(--line);border-radius:10px;padding:.85rem .95rem;font-size:.9rem;color:var(--ink-2);align-self:flex-start}
 .bd-title{font-family:var(--mono);color:var(--accent-ink);font-size:.88rem;margin-bottom:.55rem}
@@ -242,6 +248,8 @@ footer a{color:var(--accent-ink)}
 .bd-row span{color:var(--muted)}
 .bd-row b{color:var(--ink);text-align:right}
 #block-desc p{margin:.65rem 0 0;line-height:1.55}
+@media(max-width:700px){#block-layout{grid-template-columns:1fr}#block-svg{justify-self:center}}
+@media(prefers-reduced-motion:reduce){#block-svg .flow-dot{transition:none}}
 .pbar{display:flex;height:30px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
 .pseg{min-width:2px;transition:flex .5s ease}
 #pipe{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-start;margin-top:.7rem}
@@ -347,7 +355,7 @@ code runs — hover, drag, and press things.</p>
   <b>576 / 9 heads / 30 layers</b>. The checkpoint is the source of truth for shape.</aside>
   <p>The backbone is a modern (Llama-style) decoder: <strong>RMSNorm</strong>, <strong>rotary positions</strong>,
   <strong>grouped-query attention</strong>, a <strong>gated MLP</strong>, and a <strong>tied head</strong>.
-  Thirty identical <em>blocks</em> stacked on a residual stream do all the work — so we look at the block
+  Thirty identical <em>blocks</em> stacked on a residual stream do most of the computation — so we look at the block
   whole first, then open each piece. These components trace to
   <a class="cite" href="https://arxiv.org/abs/1910.07467" target="_blank" rel="noreferrer">RMSNorm</a>,
   <a class="cite" href="https://arxiv.org/abs/2002.05202" target="_blank" rel="noreferrer">gated linear units</a>,
@@ -356,8 +364,8 @@ code runs — hover, drag, and press things.</p>
 
   <h3 id="s2block">The block, assembled</h3>
   <aside class="mn"><span class="mn-num">§2</span>Every sub-layer reads from and writes back to a shared
-  <em>residual stream</em>. Because each only <em>adds</em> to it, gradients flow straight down the skip
-  path — the reason a 30-layer transformer trains at all.</aside>
+  <em>residual stream</em>. Additive skip connections provide direct gradient paths through the stack,
+  which substantially improves optimization in deep transformers.</aside>
   <p>A block is two <strong>pre-norm residual</strong> sub-layers — normalize, transform, add back — wrapped
   around the two operations we unpack in this section: <strong>attention</strong>, which mixes information
   <em>across</em> token positions, and a <strong>gated MLP</strong>, which processes each token <em>on its own</em>.</p>
@@ -367,25 +375,26 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
   dimension, one passed through a SiLU gate, multiplied elementwise, then projected back down:</p>
   <math display="block"><mrow><mi>SwiGLU</mi><mo>(</mo><mi>x</mi><mo>)</mo><mo>=</mo><msub><mi>W</mi><mi>down</mi></msub><mo>(</mo><mi>SiLU</mi><mo>(</mo><msub><mi>W</mi><mi>gate</mi></msub><mi>x</mi><mo>)</mo><mo>⊙</mo><msub><mi>W</mi><mi>up</mi></msub><mi>x</mi><mo>)</mo></mrow></math>
   <p>The gate lets the network modulate its own signal per-channel — and this MLP is where <em>most</em> of a
-  block's parameters live (the budget in §6). Click a stage, or play a token through the block:</p>
+  block's parameters live (the budget in §6). Click a stage, or trace the activation paths through the block:</p>
   <figure class="fig reveal" id="fig-block">
     <div class="fig-title">transformer block · data-flow</div>
-    <div class="controls"><button class="btn pri" id="block-play">▶ animate a token through</button><span class="hint">click any stage — its shape change &amp; parameter count appear at right</span></div>
-    <div style="display:flex;gap:1.1rem;flex-wrap:wrap;align-items:flex-start;margin-top:.6rem">
-      <svg id="block-svg" width="340" height="470" viewBox="0 0 340 470" role="img" aria-label="transformer block data flow"></svg>
+    <div class="controls"><button class="btn pri" id="block-play">▶ animate one block</button><span class="hint">click any stage — its internal shape &amp; parameter count appear at right</span></div>
+    <div id="block-layout">
+      <svg id="block-svg" width="360" height="500" viewBox="0 0 360 500" role="group" aria-label="Interactive transformer block data flow"></svg>
       <div id="block-desc"></div>
     </div>
-    <figcaption>The vertical rail is the <b>residual stream</b>; every stage is <b>[B, T, 576]</b> in and out.
-    The two dashed <b>skip arcs</b> carry the unchanged input around each sub-layer — the path gradients take
-    from layer 30 back to layer 1. Stack 30 blocks and you have the decoder.</figcaption>
+    <figcaption>The solid vertical rail carries the unchanged <b>residual stream</b>. Each transform branch
+    reads that stream, returns a same-shape update, and merges at <b>+</b>; the block interfaces remain
+    <b>[B, T, 576]</b> even though attention and the MLP use different internal shapes. Thirty blocks form
+    the computational core of the decoder, followed by a final RMSNorm and language-model head.</figcaption>
   </figure>
   <details class="deep"><summary>Go deeper: the residual stream as a communication channel</summary><div class="dbody">
     <p>A useful mental model: the residual stream is a shared bus of width 576 that every layer reads from and
     writes to. Attention <em>moves</em> information between token positions; the MLP <em>processes</em> it
     within a position. Because writes are additive, later layers can read what earlier layers deposited, and a
     sub-layer that has nothing to add can output ~0 and leave the stream unchanged. Pre-norm (normalizing the
-    <em>input</em> to each sub-layer, not its output) keeps the stream's scale from exploding across depth,
-    which is what makes very deep stacks trainable without careful warmup tricks.</p>
+    <em>input</em> to each transform branch, not the residual stream itself) gives each sub-layer a controlled
+    input scale and improves optimization. It does not require the residual stream's own scale to stay constant.</p>
   </div></details>
   <details class="deep"><summary>Go deeper: embeddings, weight tying &amp; the extended vocabulary</summary><div class="dbody">
     <p>The first and last layers are a matched pair. The <b>token embedding</b> is a lookup table
@@ -2478,66 +2487,89 @@ W(function(){
 W(function(){
   var svg=document.getElementById("block-svg"),desc=document.getElementById("block-desc"),play=document.getElementById("block-play");
   if(!svg||!desc) return;
-  var cx=150,bw=170,bx=cx-bw/2,bh=34;
+  var rail=72,branch=220,bw=176,bx=branch-bw/2,bh=34;
   var S=[
-    {y:26,n:"x · input",t:"residual",shp:"[B, T, 576]",pr:"—",
-      d:"The block input: the running <b>residual stream</b>, shape [B,&nbsp;T,&nbsp;576]. Every sub-layer below only <em>adds</em> to it, so it acts as a shared bus that all 30 layers read from and write to."},
-    {y:92,n:"RMSNorm",t:"norm",shp:"576 → 576",pr:"576 · 0.02%",
-      d:"Scale each token vector by its root-mean-square (no mean-subtraction, no bias) times a learned per-channel gain. This is <b>pre-norm</b> — it normalizes the <em>input</em> to the sub-layer, holding the stream's scale bounded as depth grows."},
-    {y:158,n:"attention · GQA + RoPE",t:"attn",shp:"576 → q 576 · k,v 192 → 576",pr:"884,736 · 25%",
-      d:"The attention sub-layer. 9 query heads (64-dim each) served by 3 key/value heads — that's the 576 vs 192 asymmetry of GQA — with rotary positions on q and k. The <em>only</em> place information moves <b>across</b> token positions. Weights: q, k, v, o projections."},
-    {y:224,n:"⊕",t:"add",shp:"576 + 576 → 576",pr:"0",
-      d:"x = x + attn(norm(x)). The skip connection re-joins the transformed signal to the untouched residual. Gradients flow straight down this addition — the reason a deep stack trains at all. No parameters of its own."},
-    {y:290,n:"RMSNorm",t:"norm",shp:"576 → 576",pr:"576 · 0.02%",
+    {y:30,x:rail,n:"x · input",t:"residual",shp:"[B, T, 576]",pr:"—",
+      d:"The block input is the running <b>residual stream</b>. A transform branch reads it while the identity path carries the same activation directly toward the merge."},
+    {y:95,x:branch,n:"RMSNorm",t:"norm",shp:"[B, T, 576] → [B, T, 576]",pr:"576 · 0.016%",
+      d:"RMSNorm rescales each token vector using its root-mean-square and a learned gain; it does not subtract the mean or add a bias. Because this is <b>pre-norm</b>, it controls the attention branch's input scale rather than directly normalizing the residual stream."},
+    {y:165,x:branch,n:"attention · GQA + RoPE",t:"attn",shp:"Q [B, 9, T, 64] · K,V [B, 3, T, 64] · out [B, T, 576]",pr:"884,736 · 24.99%",
+      d:"Nine 64-dimensional query heads share three key/value heads. RoPE rotates Q and K before attention. Each query mixes information from positions permitted by the causal and padding masks — earlier or current positions in ordinary decoder training. This is the block's cross-position operation."},
+    {y:230,x:rail,n:"⊕ · attention merge",t:"add",shp:"[B, T, 576] + [B, T, 576]",pr:"0",
+      d:"The attention update rejoins the unchanged identity path: <code>x = x + attn(norm(x))</code>. This addition supplies a direct gradient path while still allowing the attention branch to write a learned update. It has no parameters of its own."},
+    {y:300,x:branch,n:"RMSNorm",t:"norm",shp:"[B, T, 576] → [B, T, 576]",pr:"576 · 0.016%",
       d:"A second pre-norm, now guarding the feed-forward sub-layer."},
-    {y:356,n:"SwiGLU · MLP",t:"mlp",shp:"576 → 1536 → 576",pr:"2,654,208 · 75%",
-      d:"The gated feed-forward: <code>down( SiLU(gate·x) ⊙ up·x )</code>. Two parallel 576→1536 projections (gate, up), an elementwise SiLU gate, then 1536→576 back down. Acts on each position independently — and holds <b>three-quarters</b> of the block's weights."},
-    {y:422,n:"⊕ · output",t:"add",shp:"576 + 576 → 576",pr:"0",
-      d:"x = x + mlp(norm(x)). Output is still [B,&nbsp;T,&nbsp;576] — a same-shape refinement handed to the next block. Thirty of these stacked is the whole decoder."}
+    {y:370,x:branch,n:"SwiGLU · MLP",t:"mlp",shp:"[B, T, 576] → [B, T, 1536] → [B, T, 576]",pr:"2,654,208 · 74.98%",
+      d:"Two parallel 576→1536 projections form <code>SiLU(gate·x) ⊙ up·x</code>, then a 1536→576 projection returns an update to residual width. The same MLP is applied independently at every token position and holds about three-quarters of the block's weights."},
+    {y:435,x:rail,n:"⊕ · block output",t:"add",shp:"[B, T, 576] + [B, T, 576]",pr:"0",
+      d:"The MLP update merges with the identity path: <code>x = x + mlp(norm(x))</code>. The [B,&nbsp;T,&nbsp;576] result becomes the next block's residual input. After all 30 blocks, the model still applies its final RMSNorm and output head."}
   ];
   var tab={residual:"var(--ink-2)",norm:"var(--muted)",attn:"var(--accent)",mlp:"var(--amber)",add:"var(--good)"};
-  var p=['<line x1="'+cx+'" y1="34" x2="'+cx+'" y2="'+S[6].y+'" stroke="var(--line-2)" stroke-width="2"/>'];
-  var xb=bx+bw+30;
-  function arc(y1,y2){return '<path d="M'+cx+' '+y1+' C '+xb+' '+y1+', '+xb+' '+y2+', '+cx+' '+y2+'" fill="none" stroke="var(--good)" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.7"/>';}
-  p.push(arc(S[0].y+bh/2,S[3].y));
-  p.push(arc(S[3].y+15,S[6].y));
-  p.push('<text x="'+(xb+3)+'" y="'+((S[0].y+S[3].y)/2)+'" font-size="9" fill="var(--good)" style="font-family:var(--mono)">skip</text>');
-  p.push('<text x="'+(xb+3)+'" y="'+((S[3].y+S[6].y)/2)+'" font-size="9" fill="var(--good)" style="font-family:var(--mono)">skip</text>');
-  for(var i=0;i<6;i++){var ym=(S[i].y+S[i+1].y)/2;var lab=(i===0)?"[B,T,576]":"576";p.push('<text x="'+(bx-8)+'" y="'+(ym+3)+'" text-anchor="end" font-size="9" fill="var(--muted)" style="font-family:var(--mono)">'+lab+'</text>');}
+  var p=[
+    '<defs><marker id="blk-arrow-main" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7Z" fill="var(--good)"/></marker><marker id="blk-arrow-branch" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0 0L7 3.5L0 7Z" fill="var(--accent)"/></marker></defs>',
+    '<text x="12" y="72" font-size="9" fill="var(--good)" style="font-family:var(--mono)">residual</text>',
+    '<line x1="'+rail+'" y1="48" x2="'+rail+'" y2="214" stroke="var(--good)" stroke-width="3" marker-end="url(#blk-arrow-main)"/>',
+    '<line x1="'+rail+'" y1="246" x2="'+rail+'" y2="419" stroke="var(--good)" stroke-width="3" marker-end="url(#blk-arrow-main)"/>',
+    '<line x1="'+rail+'" y1="451" x2="'+rail+'" y2="480" stroke="var(--good)" stroke-width="3" marker-end="url(#blk-arrow-main)"/>',
+    '<path class="blk-branch branch-one" d="M'+rail+' 56 C110 56, '+branch+' 58, '+branch+' 78" fill="none" stroke="var(--line-2)" stroke-width="2" marker-end="url(#blk-arrow-branch)"/>',
+    '<line class="blk-branch branch-one" x1="'+branch+'" y1="112" x2="'+branch+'" y2="148" stroke="var(--line-2)" stroke-width="2" marker-end="url(#blk-arrow-branch)"/>',
+    '<path class="blk-branch branch-one" d="M'+branch+' 182 C'+branch+' 215, 125 230, 89 230" fill="none" stroke="var(--line-2)" stroke-width="2" marker-end="url(#blk-arrow-branch)"/>',
+    '<path class="blk-branch branch-two" d="M'+rail+' 258 C110 258, '+branch+' 262, '+branch+' 283" fill="none" stroke="var(--line-2)" stroke-width="2" marker-end="url(#blk-arrow-branch)"/>',
+    '<line class="blk-branch branch-two" x1="'+branch+'" y1="317" x2="'+branch+'" y2="353" stroke="var(--line-2)" stroke-width="2" marker-end="url(#blk-arrow-branch)"/>',
+    '<path class="blk-branch branch-two" d="M'+branch+' 387 C'+branch+' 420, 125 435, 89 435" fill="none" stroke="var(--line-2)" stroke-width="2" marker-end="url(#blk-arrow-branch)"/>',
+    '<text x="92" y="475" font-size="9" fill="var(--muted)" style="font-family:var(--mono)">to next block · [B,T,576]</text>'
+  ];
   S.forEach(function(s,i){
-    var g='<g class="blk-g" data-i="'+i+'" tabindex="0" role="button" aria-label="'+s.n.replace(/</g,"")+'">';
+    var g='<g class="blk-g" data-i="'+i+'" tabindex="0" role="button" aria-pressed="false" aria-label="'+s.n.replace(/</g,"")+'">';
     if(s.t==="add"){
-      g+='<circle cx="'+cx+'" cy="'+s.y+'" r="15" fill="var(--ground)" stroke="var(--good)" stroke-width="1.5"/>';
-      g+='<text x="'+cx+'" y="'+(s.y+5)+'" text-anchor="middle" font-size="16" fill="var(--good)">+</text>';
-      if(s.n.indexOf("output")>-1) g+='<text x="'+(cx+22)+'" y="'+(s.y+4)+'" font-size="9.5" fill="var(--good)" style="font-family:var(--mono)">output</text>';
+      g+='<circle cx="'+s.x+'" cy="'+s.y+'" r="16" fill="var(--ground)" stroke="var(--good)" stroke-width="1.5"/>';
+      g+='<text x="'+s.x+'" y="'+(s.y+5)+'" text-anchor="middle" font-size="16" fill="var(--good)">+</text>';
+      g+='<text x="'+(s.x+24)+'" y="'+(s.y+4)+'" font-size="9.5" fill="var(--good)" style="font-family:var(--mono)">'+(i===3?"merge":"block output")+'</text>';
     } else {
-      g+='<rect x="'+bx+'" y="'+(s.y-bh/2)+'" width="'+bw+'" height="'+bh+'" rx="8" fill="var(--ground)" stroke="var(--line-2)" stroke-width="1.2"/>';
-      g+='<rect x="'+bx+'" y="'+(s.y-bh/2)+'" width="4" height="'+bh+'" rx="2" fill="'+tab[s.t]+'"/>';
-      g+='<text x="'+cx+'" y="'+(s.y+4)+'" text-anchor="middle" font-size="11" fill="var(--ink)" style="font-family:var(--mono)">'+s.n+'</text>';
+      var w=i===0?104:bw,x=i===0?s.x-w/2:bx;
+      g+='<rect x="'+x+'" y="'+(s.y-bh/2)+'" width="'+w+'" height="'+bh+'" rx="8" fill="var(--ground)" stroke="var(--line-2)" stroke-width="1.2"/>';
+      g+='<rect x="'+x+'" y="'+(s.y-bh/2)+'" width="4" height="'+bh+'" rx="2" fill="'+tab[s.t]+'"/>';
+      g+='<text x="'+s.x+'" y="'+(s.y+4)+'" text-anchor="middle" font-size="11" fill="var(--ink)" style="font-family:var(--mono)">'+s.n+'</text>';
     }
     p.push(g+'</g>');
   });
+  p.push('<circle id="block-res-dot" class="flow-dot" cx="'+rail+'" cy="30" r="5" fill="var(--good)" stroke="var(--ground)" stroke-width="2" opacity="1" pointer-events="none"/>');
+  p.push('<circle id="block-branch-dot" class="flow-dot" cx="'+rail+'" cy="30" r="5" fill="var(--accent)" stroke="var(--ground)" stroke-width="2" opacity="0" pointer-events="none"/>');
   svg.innerHTML=p.join("");
+  var resDot=svg.querySelector("#block-res-dot"),branchDot=svg.querySelector("#block-branch-dot");
   function sel(i){
-    [].forEach.call(svg.querySelectorAll(".blk-g"),function(g){g.classList.toggle("on",+g.getAttribute("data-i")===i);});
+    [].forEach.call(svg.querySelectorAll(".blk-g"),function(g){var on=+g.getAttribute("data-i")===i;g.classList.toggle("on",on);g.setAttribute("aria-pressed",on);});
+    [].forEach.call(svg.querySelectorAll(".branch-one"),function(e){e.classList.toggle("active",i>=1&&i<=3);});
+    [].forEach.call(svg.querySelectorAll(".branch-two"),function(e){e.classList.toggle("active",i>=4&&i<=6);});
+    resDot.setAttribute("cx",rail);resDot.setAttribute("cy",S[i].y);
+    var split=i===1||i===2||i===4||i===5;
+    branchDot.setAttribute("opacity",i===0?0:1);branchDot.setAttribute("cx",split?branch:rail);branchDot.setAttribute("cy",S[i].y);
     var s=S[i];
     desc.innerHTML='<div class="bd-title">'+s.n+'</div>'
       +'<div class="bd-row"><span>shape</span><b>'+s.shp+'</b></div>'
       +'<div class="bd-row"><span>params</span><b>'+s.pr+'</b></div>'
       +'<p>'+s.d+'</p>';
   }
+  var timer=null,current=2,mode="idle";
+  function setPlay(label){if(!play)return;play.textContent=label;play.setAttribute("aria-label",label.replace(/[▶⏸↻]/g,"").trim());}
+  function stop(label){if(timer){clearInterval(timer);timer=null;}mode="idle";setPlay(label||"▶ animate one block");}
+  function start(){
+    mode="playing";setPlay("⏸ pause");timer=setInterval(function(){
+      if(current>=6){stop("↻ replay animation");return;}
+      current++;sel(current);
+    },700);
+  }
   [].forEach.call(svg.querySelectorAll(".blk-g"),function(g){
     var i=+g.getAttribute("data-i");
-    g.addEventListener("click",function(){sel(i);});
-    g.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();sel(i);}});
+    g.addEventListener("click",function(){stop();current=i;sel(i);});
+    g.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();stop();current=i;sel(i);}});
   });
-  var timer=null;
   if(play) play.addEventListener("click",function(){
-    if(timer) return;
-    var i=0;sel(0);
-    timer=setInterval(function(){i++;if(i>6){clearInterval(timer);timer=null;return;}sel(i);},650);
+    if(mode==="playing"){clearInterval(timer);timer=null;mode="paused";setPlay("▶ resume");return;}
+    if(mode!=="paused"){current=0;sel(0);}
+    start();
   });
-  sel(2);
+  sel(current);
 });
 
 /* ---------- PARAMETER BUDGET ---------- */
