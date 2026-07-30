@@ -158,6 +158,30 @@ td b{color:var(--ink)} tr:last-child td{border-bottom:none}
   .ds-panel{min-height:0}
   .ds-focus{grid-template-columns:1fr}
 }
+.rl-layout{display:grid;grid-template-columns:minmax(260px,.95fr) minmax(0,1.05fr);gap:1rem;align-items:start}
+.rl-board{min-width:0}
+#rl-canvas{width:100%;aspect-ratio:1;background:var(--ground);border:1px solid var(--line-2);border-radius:8px;image-rendering:pixelated;touch-action:none}
+.rl-dpad{display:grid;grid-template-columns:repeat(3,38px);grid-template-rows:repeat(2,34px);justify-content:center;gap:4px;margin-top:.55rem}
+.rl-dpad button{display:flex;align-items:center;justify-content:center;width:38px;height:34px;padding:0;font-size:1rem}
+.rl-dpad [data-a="0"]{grid-column:2}.rl-dpad [data-a="2"]{grid-column:1;grid-row:2}.rl-dpad [data-a="1"]{grid-column:2;grid-row:2}.rl-dpad [data-a="3"]{grid-column:3;grid-row:2}
+.rl-inspect{min-width:0;border-left:1px solid var(--line);padding-left:1rem}
+.rl-status{font-family:var(--sans);font-size:.8rem;line-height:1.45;color:var(--ink-2);min-height:2.35rem;margin:0 0 .65rem}
+.rl-probs{margin-top:.7rem;display:grid;gap:.35rem}
+.rl-prow{display:grid;grid-template-columns:1.2rem minmax(0,1fr) 6.2rem;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+.rl-prow b{font-weight:560;color:var(--ink-2);text-align:right}
+.rl-ptrack{height:8px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+.rl-pfill{height:100%;background:var(--accent);border-radius:4px;transition:width .25s ease}
+.rl-prow.chosen{color:var(--accent-ink)}.rl-prow.chosen .rl-pfill{background:var(--good)}
+.rl-step-label{font-family:var(--mono);font-size:.72rem;color:var(--accent-ink);min-height:1.2rem;margin:.45rem 0 0}
+#rl-reward-mode,#rl-overlay{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+#rl-reward-mode button,#rl-overlay button{min-width:0;white-space:normal;line-height:1.2;padding:.4rem .3rem}
+.rl-legend{display:flex;flex-wrap:wrap;gap:.35rem .85rem;font-family:var(--sans);font-size:.7rem;color:var(--muted);margin-top:.5rem}
+.rl-legend span{display:inline-flex;align-items:center;gap:.3rem}
+.rl-pixel{width:10px;height:10px;display:inline-block;border-radius:1px}
+@media(max-width:700px){
+  .rl-layout{grid-template-columns:1fr}
+  .rl-inspect{border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:.8rem}
+}
 .demo{background:var(--good-soft);color:var(--good);border-radius:6px;padding:.2rem .3rem;transition:opacity .3s;display:block;margin-top:.3rem}
 .demo.hidden{opacity:.14;filter:grayscale(1)}
 .diffwrong{background:var(--bad-soft);color:var(--bad);border-radius:4px;padding:0 .15em}
@@ -929,6 +953,111 @@ labels[-<span class="s">1</span>] = -<span class="s">100</span></pre>
 python train/sft.py --datasets sroie,cord --report-to none</pre>
 </section>
 
+<section class="section" id="s75">
+  <div class="snum">Section 7.5 · RL primer</div>
+  <h2>How rewards become behavior</h2>
+  <aside class="mn"><span class="mn-num">§7.5</span>This game uses a small tabular policy and a learned
+  state-value baseline. It teaches the policy-gradient mechanism; it is not a simulation of the transformer
+  or GRPO's clipped objective.</aside>
+  <p>Supervised learning supplies the action to imitate. In <strong>reinforcement learning</strong>, an agent
+  samples actions from a <strong>policy</strong>, observes rewards from the environment, and adjusts the
+  policy toward actions whose outcomes were better than expected. A reward evaluates behavior; it does not
+  directly provide the correct action.</p>
+  <p>An episode produces rewards <math><mrow><msub><mi>r</mi><mi>t</mi></msub></mrow></math>. Their discounted
+  sum is the <strong>return</strong>, and a value function estimates the return expected from a state:</p>
+  <math display="block"><mrow><msub><mi>G</mi><mi>t</mi></msub><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow><mi>T</mi></munderover><msup><mi>γ</mi><mi>k</mi></msup><msub><mi>r</mi><mrow><mi>t</mi><mo>+</mo><mi>k</mi></mrow></msub><mo>,</mo><mspace width=".7em"/><msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub><mo>=</mo><msub><mi>G</mi><mi>t</mi></msub><mo>−</mo><mi>V</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo></mrow></math>
+  <p>The estimated <strong>advantage</strong> asks a relative question: did this sampled outcome beat the
+  baseline for that state? Try the complete loop below. Drive manually, sample the policy, inspect any step,
+  then apply an update and watch its action probabilities change.</p>
+  <figure class="fig reveal" id="fig-rlgame">
+    <div class="fig-title">policy playground · reward → return → advantage → update</div>
+    <div class="controls">
+      <button class="btn pri" id="rl-run">Run one episode</button>
+      <button class="btn" id="rl-update" disabled>Apply update</button>
+      <button class="btn" id="rl-train">Train 50 episodes</button>
+      <button class="btn" id="rl-reset" title="Reset policy" aria-label="Reset policy">↺</button>
+    </div>
+    <div class="controls" style="margin-top:.6rem">
+      <span class="hint">reward:</span>
+      <div class="seg" id="rl-reward-mode" role="group" aria-label="Reward design">
+        <button class="on" data-rm="sparse">sparse</button>
+        <button data-rm="shaped">distance shaped</button>
+        <button data-rm="bonus">bonus trap</button>
+      </div>
+    </div>
+    <div class="controls" style="margin-top:.55rem">
+      <span class="hint">overlay:</span>
+      <div class="seg" id="rl-overlay" role="group" aria-label="Grid overlay">
+        <button class="on" data-ov="path">latest path</button>
+        <button data-ov="policy">policy</button>
+        <button data-ov="value">value</button>
+      </div>
+    </div>
+    <div class="rl-layout" style="margin-top:.8rem">
+      <div class="rl-board">
+        <canvas id="rl-canvas" width="400" height="400" tabindex="0" role="img" aria-label="Five by five reinforcement-learning gridworld"></canvas>
+        <div class="rl-dpad" aria-label="Manual movement controls">
+          <button class="btn" data-a="0" aria-label="Move up" title="Move up">↑</button>
+          <button class="btn" data-a="2" aria-label="Move left" title="Move left">←</button>
+          <button class="btn" data-a="1" aria-label="Move down" title="Move down">↓</button>
+          <button class="btn" data-a="3" aria-label="Move right" title="Move right">→</button>
+        </div>
+        <div class="rl-legend">
+          <span><i class="rl-pixel" style="background:var(--accent)"></i> agent</span>
+          <span><i class="rl-pixel" style="background:var(--good)"></i> goal +1</span>
+          <span><i class="rl-pixel" style="background:var(--bad)"></i> terminal −1</span>
+          <span><i class="rl-pixel" style="background:var(--amber)"></i> repeatable bonus</span>
+        </div>
+      </div>
+      <div class="rl-inspect">
+        <p class="rl-status" id="rl-status"></p>
+        <div class="stats">
+          <div class="stat"><div class="k">episodes</div><div class="v" id="rl-episode">0</div></div>
+          <div class="stat"><div class="k">outcome</div><div class="v" id="rl-outcome">—</div></div>
+          <div class="stat accent"><div class="k">return G₀</div><div class="v" id="rl-return">—</div></div>
+          <div class="stat"><div class="k">steps</div><div class="v" id="rl-steps">0</div></div>
+        </div>
+        <div class="sliderrow" style="margin-top:.85rem">inspect step
+          <input type="range" id="rl-step" min="0" max="0" value="0" disabled>
+          <span class="val" id="rl-step-val">—</span>
+        </div>
+        <div class="rl-step-label" id="rl-step-label">Run or manually play an episode.</div>
+        <div class="stats">
+          <div class="stat"><div class="k">reward rₜ</div><div class="v" id="rl-reward">—</div></div>
+          <div class="stat"><div class="k">return Gₜ</div><div class="v" id="rl-g">—</div></div>
+          <div class="stat"><div class="k">baseline V(sₜ)</div><div class="v" id="rl-v">—</div></div>
+          <div class="stat accent"><div class="k">advantage Âₜ</div><div class="v" id="rl-adv">—</div></div>
+        </div>
+        <div class="rl-probs" id="rl-probs" aria-label="Action probabilities"></div>
+      </div>
+    </div>
+    <figcaption>The policy is a probability distribution over four actions in every cell. This demonstration
+    uses Monte Carlo returns with <b>γ = 0.97</b>, updates a tabular value baseline, and applies the
+    log-softmax policy-gradient direction. Random sampling means an individual run can improve or regress.</figcaption>
+  </figure>
+  <div class="tbl"><table>
+    <thead><tr><th>Gridworld concept</th><th>Language-model analogue</th></tr></thead>
+    <tbody>
+      <tr><td>state</td><td>the token prefix generated so far</td></tr>
+      <tr><td>action</td><td>the next sampled token</td></tr>
+      <tr><td>policy</td><td>the next-token probability distribution</td></tr>
+      <tr><td>episode</td><td>one generated completion</td></tr>
+      <tr><td>return / advantage</td><td>an outcome score and how it compares with a baseline</td></tr>
+    </tbody>
+  </table></div>
+  <div class="take"><div class="ct">the bridge to GRPO</div>The game learns <math><mi>V</mi><mo>(</mo><mi>s</mi><mo>)</mo></math>
+  and estimates <math><mover><mi>A</mi><mo>^</mo></mover><mo>=</mo><mi>G</mi><mo>−</mo><mi>V</mi></math>.
+  The GRPO section next uses a different baseline: other completions sampled for the same prompt. It does
+  <em>not</em> train a separate value network.</div>
+  <details class="intuition"><summary>Intuition: reward design changes what “good” behavior means</summary><div class="ibody">
+    <p><b>Sparse</b> gives feedback only at terminal cells, so successful exploration can be rare.
+    <b>Distance shaped</b> adds incremental feedback for progress toward the goal. <b>Bonus trap</b> pays
+    every time the amber tile is entered; because the bonus repeats, a policy can earn more by circling it
+    than by finishing. The agent is optimizing the defined return, not the designer's unstated intention.</p>
+  </div></details>
+  <p class="hint">Reference: <a class="cite" href="http://incompleteideas.net/book/the-book-2nd.html" target="_blank" rel="noreferrer">Sutton &amp; Barto, Reinforcement Learning</a>.</p>
+</section>
+
 <section class="section" id="s8">
   <div class="snum">Section 8 · GRPO</div>
   <h2>Reinforcement learning from a local reward</h2>
@@ -1277,6 +1406,7 @@ Here is the correct extraction for reference:
     <li><a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noreferrer">GQA</a> and <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">FlashAttention</a>.</li>
     <li><a href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noreferrer">Vision Transformer</a>, <a href="https://arxiv.org/abs/2303.15343" target="_blank" rel="noreferrer">SigLIP</a>, and <a href="https://arxiv.org/abs/2502.14786" target="_blank" rel="noreferrer">SigLIP 2</a>.</li>
     <li><a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">LoRA</a>.</li>
+    <li><a href="http://incompleteideas.net/book/the-book-2nd.html" target="_blank" rel="noreferrer">Sutton &amp; Barto, Reinforcement Learning</a> — returns, value functions, and policy gradients.</li>
     <li><a href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noreferrer">DeepSeekMath</a> — GRPO.</li>
     <li><a href="https://arxiv.org/abs/2306.13649" target="_blank" rel="noreferrer">On-Policy Distillation</a> and the <a href="https://huggingface.co/docs/trl/main/gkd_trainer" target="_blank" rel="noreferrer">TRL GKD docs</a>.</li>
     <li><a href="https://arxiv.org/abs/2601.19897" target="_blank" rel="noreferrer">Self-Distillation Enables Continual Learning</a> — SDFT.</li>
@@ -1296,6 +1426,9 @@ Here is the correct extraction for reference:
     new full-attention query still scans <math><mi>T</mi></math> cached keys: O(T) attention work per layer.</dd>
     <dt>LoRA</dt><dd>Low-Rank Adaptation — train a small <math><mi>BA</mi></math> update beside frozen weights (~1% of params).</dd>
     <dt>pair_f1</dt><dd>F1 over (key, value) pairs of the extracted JSON — the headline correctness metric.</dd>
+    <dt>Policy</dt><dd>A distribution over actions conditioned on the current state; for a language model, the next-token distribution.</dd>
+    <dt>Reward / return</dt><dd>A reward scores a transition or outcome. The return is the discounted sum of future rewards from one step.</dd>
+    <dt>Value / advantage</dt><dd>Value estimates expected return from a state. Advantage measures how a sampled action or outcome compares with a baseline.</dd>
     <dt>On-policy</dt><dd>Training on sequences the current model itself generated (GRPO, GKD, SDFT), vs. teacher-forced gold (SFT).</dd>
     <dt>JSD / KL</dt><dd>Divergences between distributions. KL is asymmetric; forward and reverse swap
     its arguments. JSD compares each distribution with a mixture and is symmetric when β=0.5.</dd>
@@ -1371,7 +1504,7 @@ W(function(){
   var items=[["part1","Part I · Building"],["s1","1 · The splice"],["s2","2 · LLM backbone"],
     ["s2pos","2.2 · Position methods"],["s25","2.5 · Attention zoo"],["s3","3 · Vision (ViT)"],["s35","3.5 · Resolution"],
     ["s4","4 · Projector"],["s5","5 · Data & mask"],["s6","6 · Forward"],["sL","· LoRA"],
-    ["part2","Part II · Teaching"],["s7","7 · SFT"],["s8","8 · GRPO"],["s9","9 · Distillation"],
+    ["part2","Part II · Teaching"],["s7","7 · SFT"],["s75","7.5 · RL primer"],["s8","8 · GRPO"],["s9","9 · Distillation"],
     ["s95","9.5 · M-RoPE"],["s10","10 · SDFT"],["s11","11 · Compare"],
     ["recap","· When to use"],["references","· Sources"],["glossary","· Glossary"],["appendix","· Appendix"]];
   var ol=document.createElement("ol");
@@ -2071,6 +2204,161 @@ W(function(){
   predEl.addEventListener("input",upd);
   [].forEach.call(document.querySelectorAll("[data-preset]"),function(b){b.addEventListener("click",function(){predEl.value=pres[b.dataset.preset];upd();});});
   predEl.value=pres.partial;upd();
+});
+
+/* ---------- RL POLICY PLAYGROUND ---------- */
+W(function(){
+  var cv=document.getElementById("rl-canvas");if(!cv)return;
+  var ctx=cv.getContext("2d"),N=5,C=80,gamma=.97,maxSteps=24;
+  var ACT=[{dx:0,dy:-1,n:"up",s:"↑"},{dx:0,dy:1,n:"down",s:"↓"},{dx:-1,dy:0,n:"left",s:"←"},{dx:1,dy:0,n:"right",s:"→"}];
+  var start={x:0,y:4},goal={x:4,y:0},bonus={x:2,y:3};
+  var walls=new Set(["1,1","2,1","3,3"]),hazards=new Set(["1,3","3,1"]);
+  var logits=[],values=[],episode=null,current={x:start.x,y:start.y},playing=false,updated=false;
+  var episodeCount=0,selected=0,rewardMode="sparse",overlay="path",message="";
+  var runBtn=document.getElementById("rl-run"),updateBtn=document.getElementById("rl-update"),trainBtn=document.getElementById("rl-train"),resetBtn=document.getElementById("rl-reset");
+  var stepRange=document.getElementById("rl-step"),stepVal=document.getElementById("rl-step-val"),stepLabel=document.getElementById("rl-step-label");
+  var statusEl=document.getElementById("rl-status"),epEl=document.getElementById("rl-episode"),outcomeEl=document.getElementById("rl-outcome"),retEl=document.getElementById("rl-return"),stepsEl=document.getElementById("rl-steps");
+  var rewardEl=document.getElementById("rl-reward"),gEl=document.getElementById("rl-g"),vEl=document.getElementById("rl-v"),advEl=document.getElementById("rl-adv"),probsEl=document.getElementById("rl-probs");
+  var modeButtons=document.querySelectorAll("#rl-reward-mode button"),overlayButtons=document.querySelectorAll("#rl-overlay button");
+  function key(s){return s.x+","+s.y;}function ix(s){return s.y*N+s.x;}function cp(s){return{x:s.x,y:s.y};}
+  function same(a,b){return a.x===b.x&&a.y===b.y;}function blocked(s){return s.x<0||s.y<0||s.x>=N||s.y>=N||walls.has(key(s));}
+  function resetTables(){logits=[];values=[];for(var i=0;i<N*N;i++){logits.push([0,0,0,0]);values.push(0);}}
+  function policy(s){
+    var z=logits[ix(s)],mx=Math.max.apply(null,z),ex=z.map(function(v){return Math.exp(v-mx);}),sum=ex.reduce(function(a,b){return a+b;},0);
+    return ex.map(function(v){return v/sum;});
+  }
+  function sampleAction(p){var r=Math.random(),sum=0;for(var a=0;a<p.length;a++){sum+=p[a];if(r<=sum)return a;}return p.length-1;}
+  function potential(s){return .16*(8-(Math.abs(goal.x-s.x)+Math.abs(goal.y-s.y)));}
+  function transition(s,a){
+    var proposed={x:s.x+ACT[a].dx,y:s.y+ACT[a].dy},next=blocked(proposed)?cp(s):proposed;
+    var terminal=false,outcome="",reward=0;
+    if(same(next,goal)){reward=1;terminal=true;outcome="goal";}
+    else if(hazards.has(key(next))){reward=-1;terminal=true;outcome="hazard";}
+    if(rewardMode==="shaped")reward+=gamma*potential(next)-potential(s);
+    if(rewardMode==="bonus"&&same(next,bonus))reward+=.25;
+    return{next:next,reward:reward,terminal:terminal,outcome:outcome};
+  }
+  function begin(silent){
+    episode={steps:[],outcome:"playing"};current=cp(start);playing=true;updated=false;selected=0;
+    if(!silent){message="Episode in progress. Use the arrow controls, or sample a complete episode.";render();}
+  }
+  function finish(outcome,silent){
+    playing=false;episode.outcome=outcome||"limit";var G=0;
+    for(var i=episode.steps.length-1;i>=0;i--){var e=episode.steps[i];G=e.r+gamma*G;e.G=G;e.V=values[ix(e.s)];e.adv=G-e.V;}
+    episodeCount++;selected=0;updated=false;
+    message=episode.outcome==="goal"?"The policy reached the goal. Inspect how each return compares with its state baseline.":
+      episode.outcome==="hazard"?"The episode ended on a penalty tile. Negative advantages can make its sampled actions less likely.":
+      "The episode reached the step limit. With sparse reward, an uninformative zero-return episode supplies little learning signal.";
+    if(!silent)render();
+  }
+  function act(a,silent){
+    if(!playing)begin(silent);
+    var s=cp(current),p=policy(s),tr=transition(s,a);
+    episode.steps.push({s:s,a:a,r:tr.reward,next:cp(tr.next),probs:p.slice()});current=cp(tr.next);
+    if(tr.terminal)finish(tr.outcome,silent);
+    else if(episode.steps.length>=maxSteps)finish("limit",silent);
+    else if(!silent){message="Episode in progress · "+episode.steps.length+" transition"+(episode.steps.length===1?"":"s")+" observed.";render();}
+  }
+  function runEpisode(silent){
+    begin(true);
+    while(playing){var p=policy(current);act(sampleAction(p),true);}
+    if(!silent)render();
+  }
+  function applyUpdate(silent){
+    if(!episode||playing||updated||!episode.steps.length)return;
+    var targets={};
+    episode.steps.forEach(function(e){
+      var si=ix(e.s),p=e.probs,actorRate=.45;
+      for(var a=0;a<4;a++){logits[si][a]+=actorRate*e.adv*((a===e.a?1:0)-p[a]);logits[si][a]=Math.max(-6,Math.min(6,logits[si][a]));}
+      if(!targets[si])targets[si]={sum:0,n:0};targets[si].sum+=e.G;targets[si].n++;
+    });
+    Object.keys(targets).forEach(function(k){var t=targets[k],target=t.sum/t.n;values[k]+=.24*(target-values[k]);values[k]=Math.max(-5,Math.min(5,values[k]));});
+    episode.steps.forEach(function(e){e.after=policy(e.s)[e.a];});
+    updated=true;
+    if(!silent){message="Update applied. Chosen actions with positive advantage were pushed up; negative-advantage choices were pushed down.";render();}
+  }
+  function trainMany(){
+    for(var i=0;i<50;i++){runEpisode(true);applyUpdate(true);}
+    message="Trained on 50 sampled episodes. Inspect the last update or switch to the policy/value overlay.";
+    render();
+  }
+  function fmt(v){if(v===null||v===undefined||!isFinite(v))return"—";var n=Math.abs(v)<.0005?0:v;return(n>0?"+":"")+n.toFixed(2);}
+  function drawArrow(cx,cy,a,p){
+    var len=8+14*p,w=3,x=Math.round(cx),y=Math.round(cy);ctx.fillStyle=css("--accent");ctx.globalAlpha=.35+.65*p;
+    if(a===0){ctx.fillRect(x-1,y-len,3,len);ctx.fillRect(x-5,y-len,11,3);}
+    if(a===1){ctx.fillRect(x-1,y,3,len);ctx.fillRect(x-5,y+len-3,11,3);}
+    if(a===2){ctx.fillRect(x-len,y-1,len,3);ctx.fillRect(x-len,y-5,3,11);}
+    if(a===3){ctx.fillRect(x,y-1,len,3);ctx.fillRect(x+len-3,y-5,3,11);}
+    ctx.globalAlpha=1;
+  }
+  function drawRobot(s){
+    var x=s.x*C+C/2,y=s.y*C+C/2;ctx.fillStyle=css("--accent");ctx.fillRect(x-18,y-14,36,28);ctx.fillRect(x-12,y-20,24,6);ctx.fillRect(x-22,y-8,4,16);ctx.fillRect(x+18,y-8,4,16);
+    ctx.fillStyle="#fff";ctx.fillRect(x-10,y-7,6,6);ctx.fillRect(x+4,y-7,6,6);ctx.fillStyle=css("--ink");ctx.fillRect(x-8,y-5,2,2);ctx.fillRect(x+6,y-5,2,2);
+  }
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);ctx.imageSmoothingEnabled=false;
+    for(var y=0;y<N;y++)for(var x=0;x<N;x++){
+      var s={x:x,y:y},k=key(s),px=x*C,py=y*C;ctx.fillStyle=css("--ground");ctx.fillRect(px,py,C,C);
+      if(overlay==="value"&&!walls.has(k)&&!hazards.has(k)&&!same(s,goal)){
+        var v=values[ix(s)],alpha=Math.min(.5,Math.abs(v)*.45);ctx.globalAlpha=alpha;ctx.fillStyle=v>=0?css("--good"):css("--bad");ctx.fillRect(px+2,py+2,C-4,C-4);ctx.globalAlpha=1;
+      }
+      if(walls.has(k)){ctx.fillStyle=css("--panel-2");ctx.fillRect(px+5,py+5,C-10,C-10);for(var b=0;b<3;b++){ctx.fillStyle=css("--line-2");ctx.fillRect(px+10+b*20,py+18+(b%2)*22,14,8);}}
+      if(hazards.has(k)){ctx.fillStyle=css("--bad-soft");ctx.fillRect(px+5,py+5,C-10,C-10);ctx.fillStyle=css("--bad");for(var q=0;q<5;q++){ctx.fillRect(px+20+q*7,py+20+q*7,7,7);ctx.fillRect(px+48-q*7,py+20+q*7,7,7);}}
+      if(same(s,goal)){ctx.fillStyle=css("--good-soft");ctx.fillRect(px+5,py+5,C-10,C-10);ctx.fillStyle=css("--good");ctx.fillRect(px+19,py+19,42,42);ctx.fillStyle=css("--ground");ctx.fillRect(px+27,py+27,26,26);ctx.fillStyle=css("--good");ctx.fillRect(px+36,py+31,8,18);}
+      if(same(s,bonus)){ctx.fillStyle=css("--amber-soft");ctx.fillRect(px+8,py+8,C-16,C-16);ctx.fillStyle=css("--amber");ctx.fillRect(px+32,py+20,16,40);ctx.fillRect(px+20,py+32,40,16);}
+      if(same(s,start)){ctx.fillStyle=css("--muted");ctx.font="600 11px "+css("--sans");ctx.fillText("START",px+7,py+C-8);}
+      if(overlay==="policy"&&!walls.has(k)&&!hazards.has(k)&&!same(s,goal)){
+        var p=policy(s),best=0;for(var a=1;a<4;a++)if(p[a]>p[best])best=a;drawArrow(px+C/2,py+C/2,best,p[best]);
+      }
+      if(overlay==="value"&&!walls.has(k)){ctx.fillStyle=css("--ink-2");ctx.font="600 12px "+css("--mono");ctx.textAlign="center";ctx.fillText(values[ix(s)].toFixed(2),px+C/2,py+C-8);ctx.textAlign="start";}
+      ctx.strokeStyle=css("--line");ctx.lineWidth=1;ctx.strokeRect(px+.5,py+.5,C-1,C-1);
+    }
+    if(overlay==="path"&&episode&&episode.steps.length){
+      ctx.strokeStyle=css("--accent");ctx.lineWidth=5;ctx.globalAlpha=.7;ctx.beginPath();ctx.moveTo(start.x*C+C/2,start.y*C+C/2);
+      episode.steps.forEach(function(e){ctx.lineTo(e.next.x*C+C/2,e.next.y*C+C/2);});ctx.stroke();ctx.globalAlpha=1;
+      if(!playing&&episode.steps[selected]){var ss=episode.steps[selected].s;ctx.strokeStyle=css("--amber");ctx.lineWidth=4;ctx.strokeRect(ss.x*C+5,ss.y*C+5,C-10,C-10);}
+    }
+    drawRobot(current);
+  }
+  function renderProbRows(p,chosen,e){
+    probsEl.innerHTML='<div class="ds-panel-title">policy at selected state</div>'+p.map(function(v,a){
+      var now=e&&e.after!=null&&a===chosen?e.after:policy(e?e.s:start)[a],label=e&&e.after!=null&&a===chosen?Math.round(v*100)+"% → "+Math.round(now*100)+"%":Math.round(now*100)+"%";
+      return'<div class="rl-prow'+(a===chosen?' chosen':'')+'"><span>'+ACT[a].s+'</span><div class="rl-ptrack"><div class="rl-pfill" style="width:'+Math.max(2,now*100)+'%"></div></div><b>'+label+'</b></div>';
+    }).join("");
+  }
+  function render(){
+    draw();statusEl.textContent=message;epEl.textContent=episodeCount;stepsEl.textContent=episode?episode.steps.length:0;
+    outcomeEl.textContent=episode?episode.outcome:"—";retEl.textContent=episode&&!playing&&episode.steps.length?fmt(episode.steps[0].G):"—";
+    updateBtn.disabled=!episode||playing||updated||!episode.steps.length;
+    modeButtons.forEach(function(b){var on=b.dataset.rm===rewardMode;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);});
+    overlayButtons.forEach(function(b){var on=b.dataset.ov===overlay;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);});
+    if(!episode||playing||!episode.steps.length){
+      stepRange.disabled=true;stepVal.textContent="—";stepLabel.textContent=playing?"Finish the episode to compute returns.":"Run or manually play an episode.";
+      rewardEl.textContent=gEl.textContent=vEl.textContent=advEl.textContent="—";advEl.style.color="";
+      renderProbRows(policy(current),-1,null);return;
+    }
+    selected=Math.max(0,Math.min(selected,episode.steps.length-1));stepRange.disabled=false;stepRange.max=episode.steps.length-1;stepRange.value=selected;stepVal.textContent=(selected+1)+"/"+episode.steps.length;
+    var e=episode.steps[selected];stepLabel.textContent="t="+selected+" · state ("+e.s.x+","+e.s.y+") · action "+ACT[e.a].n;
+    rewardEl.textContent=fmt(e.r);gEl.textContent=fmt(e.G);vEl.textContent=fmt(e.V);advEl.textContent=fmt(e.adv);advEl.style.color=e.adv>0?css("--good"):e.adv<0?css("--bad"):css("--muted");
+    renderProbRows(e.probs,e.a,e);
+  }
+  function resetAll(){
+    resetTables();episode=null;current=cp(start);playing=false;updated=false;episodeCount=0;selected=0;
+    message=rewardMode==="sparse"?"Sparse reward: only the goal and penalty tiles provide feedback.":
+      rewardMode==="shaped"?"Distance shaping adds incremental feedback for moving toward the goal.":
+      "The amber bonus pays on every entry, so repeatedly revisiting it can beat the intended goal.";
+    render();
+  }
+  runBtn.addEventListener("click",function(){runEpisode(false);});
+  updateBtn.addEventListener("click",function(){applyUpdate(false);});
+  trainBtn.addEventListener("click",trainMany);resetBtn.addEventListener("click",resetAll);
+  stepRange.addEventListener("input",function(){selected=+stepRange.value;render();});
+  [].forEach.call(document.querySelectorAll(".rl-dpad button"),function(b){b.addEventListener("click",function(){act(+b.dataset.a,false);});});
+  modeButtons.forEach(function(b){b.addEventListener("click",function(){rewardMode=b.dataset.rm;resetAll();});});
+  overlayButtons.forEach(function(b){b.addEventListener("click",function(){overlay=b.dataset.ov;render();});});
+  cv.addEventListener("keydown",function(e){var map={ArrowUp:0,ArrowDown:1,ArrowLeft:2,ArrowRight:3};if(map[e.key]!=null){e.preventDefault();act(map[e.key],false);}});
+  new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+  resetAll();
 });
 
 /* ---------- GRPO ROLLOUT ---------- */
