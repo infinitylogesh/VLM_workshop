@@ -603,15 +603,17 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
       <tr><td>heads</td><td>12, full MHA</td><td>9 query / 3 KV (GQA)</td></tr>
       <tr><td>width · depth</td><td>768 · 12 blocks</td><td>576 · 30 blocks</td></tr>
       <tr><td>token 0</td><td>no CLS — all 256 patches kept</td><td>first text token</td></tr>
-      <tr><td>pretraining</td><td>image–text sigmoid contrastive</td><td>next-token on text</td></tr>
+      <tr><td>pretraining</td><td>SigLIP objective + captioning and self-supervision</td><td>next-token on text</td></tr>
     </tbody>
   </table></div>
-  <p>And the vision tower is specifically <strong>SigLIP2</strong>. Where CLIP's contrastive loss softmaxes
-  over every image–text pair in a batch (so the batch is a global normalizer), <strong>SigLIP</strong>
-  replaces it with a simple <em>pairwise sigmoid</em> loss — each pair judged independently. That's cheaper,
-  scales to larger batches, and yields stronger features for small encoders. nanoVLM keeps the
-  <code>vit_cls_flag=False</code> setting: <em>no</em> CLS token, so all 256 patch vectors survive — exactly
-  what the projector needs to preserve the spatial grid.
+  <p>And the vision tower is specifically <strong>SigLIP2</strong>. The original <strong>SigLIP</strong>
+  replaces CLIP's batch-global softmax normalization with a pairwise sigmoid loss, so each image–text pair
+  can be scored independently; the paper reports that this supports large batches and also performs well at
+  smaller ones. SigLIP2 keeps that foundation and adds captioning-based pretraining, self-distillation,
+  masked prediction, and online data curation. nanoVLM loads the resulting pretrained vision weights; it
+  does not reproduce that pretraining recipe. It also keeps <code>vit_cls_flag=False</code>: <em>no</em> CLS
+  token, so all 256 patch vectors survive for the projector.
+  <a class="cite" href="https://arxiv.org/abs/2303.15343" target="_blank" rel="noreferrer">SigLIP</a>
   <a class="cite" href="https://arxiv.org/abs/2502.14786" target="_blank" rel="noreferrer">SigLIP 2</a></p>
   <details class="deep"><summary>Go deeper: patch embedding, and loading pretrained weights into from-scratch code</summary><div class="dbody">
     <p>The "patchify" step is one <b>strided convolution</b>: a <code>Conv2d</code> with kernel = stride = 16
@@ -666,9 +668,9 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
 <section class="section" id="s5">
   <div class="snum">Section 5</div>
   <h2>Data &amp; the loss mask</h2>
-  <aside class="mn"><span class="mn-num">§5</span>Under <code>transformers ≥ 5.3</code> the assistant spans
-  must be measured with <code>return_dict=True</code>; missing it silently masks <em>everything</em> to
-  <code>-100</code> and the loss goes <code>nan</code> — a real bug the fork fixed.</aside>
+  <aside class="mn"><span class="mn-num">§5</span>This fork requests the tokenizer's structured return so it
+  can use both <code>input_ids</code> and <code>attention_mask</code>. Supervision spans are then measured
+  turn by turn, not found by searching for one marker.</aside>
   <p>A sample is <code>(image, conversation)</code>. The image becomes the placeholder string
   <code>&lt;image&gt;×64</code> prepended to the user turn; everything is tokenized; then a <strong>loss
   mask marks only the assistant's answer</strong>. Toggle the mask:</p>
@@ -683,14 +685,25 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
       <span><i class="sw" style="background:var(--good)"></i> answer (supervised)</span></div>
   </figure>
   <h3 id="s55">Where the boundary comes from: the chat template</h3>
-  <p>The mask isn't guessed — it's found. The tokenizer's <em>chat template</em> wraps each turn in role
-  markers, e.g. <code>&lt;|im_start|>user … &lt;|im_end|></code> then
-  <code>&lt;|im_start|>assistant</code>. The collator locates that last assistant marker and supervises
-  everything after it. The special tokens <em>are</em> the supervision boundary.</p>
-  <pre><span class="c"># the completion boundary is a token search, not a heuristic</span>
-start = find_after(input_ids, tokenize(<span class="s">"&lt;|im_start|>assistant\n"</span>))
-labels[:start] = -<span class="s">100</span>          <span class="c"># mask prompt + image + role headers</span>
-labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never train on image placeholders</span></pre>
+  <p>The mask isn't guessed from raw text. nanoVLM renders the complete conversation and also renders each
+  message with the same <em>chat template</em>. It advances a token cursor message by message and marks the
+  content and turn-ending span of <em>every</em> assistant turn; user turns, role prefixes, and image
+  placeholders remain masked. <code>return_dict=True</code> matters because the code needs the actual
+  <code>input_ids</code> length from each rendered segment.
+  <a class="cite" href="https://github.com/infinitylogesh/nanoVLM/blob/2f16019ac7ff0392d6853c9f8f8e17dc27630c6e/data/datasets.py#L65-L116" target="_blank" rel="noreferrer">fork implementation</a></p>
+  <pre><span class="c"># data/datasets.py — measure each templated message span</span>
+conv = apply_chat_template(messages, tokenize=<span class="k">True</span>,
+                           add_special_tokens=<span class="k">False</span>, return_dict=<span class="k">True</span>)
+mask = zeros_like(conv[<span class="s">"input_ids"</span>])
+cursor = <span class="s">0</span>
+<span class="k">for</span> message <span class="k">in</span> messages:
+    segment = apply_chat_template([message], tokenize=<span class="k">True</span>,
+                                  add_special_tokens=<span class="k">False</span>, return_dict=<span class="k">True</span>)
+    <span class="k">if</span> message[<span class="s">"role"</span>] == <span class="s">"assistant"</span>:
+        mask[cursor + prefix_len : cursor + len(segment[<span class="s">"input_ids"</span>])] = <span class="s">1</span>
+    cursor += len(segment[<span class="s">"input_ids"</span>])
+labels = input_ids.masked_fill(~mask, -<span class="s">100</span>).roll(-<span class="s">1</span>)
+labels[-<span class="s">1</span>] = -<span class="s">100</span></pre>
 </section>
 
 <section class="section" id="s6">
@@ -746,7 +759,8 @@ labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never tr
   <div class="snum">Interlude · used throughout Part II</div>
   <h2>LoRA: training 1% of the weights</h2>
   <aside class="mn"><span class="mn-num">LoRA</span>Every method in Part II trains a LoRA adapter, not the
-  full model — so a 4B model fine-tunes on one GPU and each experiment is a ~50 MB file, not 8 GB.</aside>
+  full model. The saved rank-32 adapters here are <b>170 MB</b> for Qwen3.5-4B and <b>51 MB</b> for
+  Qwen3.5-0.8B, rather than a multi-gigabyte full checkpoint.</aside>
   <p>Full fine-tuning updates all billions of weights. <strong>LoRA</strong> freezes them and learns a small
   low-rank update beside each target matrix: for a frozen <math><mi>W</mi></math>, train
   <math><mi>A</mi></math> and <math><mi>B</mi></math> with rank <math><mi>r</mi></math> and use</p>
@@ -759,9 +773,12 @@ labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never tr
     <div class="fig-title">lora · rank vs. trainable parameters</div>
     <div class="sliderrow">rank r <input type="range" id="lora-range" min="1" max="256" step="1" value="32"><span class="val" id="lora-val">32</span></div>
     <div class="stats" id="lora-out"></div>
-    <figcaption>Targets = <code>q,k,v,o,gate,up,down</code> across all layers (this repo's
-    <code>LORA_TARGETS</code>). At <code>r=32</code> you train well under 2% of the model and can
-    <code>merge_and_unload()</code> the adapter back into <math><mi>W</mi></math> for zero-overhead inference.</figcaption>
+    <figcaption>Measured from this repo's Qwen3.5-4B adapter. Its 32 language layers are hybrid:
+    <code>gate/up/down</code> are adapted in all 32, while <code>q/k/v/o</code> exist in the 8 full-attention
+    layers; the 24 linear-attention mixers use different module names. At <code>r=32</code> this is
+    <b>42.47M trainable parameters</b> (about <b>0.94%</b> of the frozen base). The adapter can be merged
+    into <math><mi>W</mi></math> for inference.
+    <a class="cite" href="https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/config.json" target="_blank" rel="noreferrer">Qwen3.5-4B config</a></figcaption>
   </figure>
 </section>
 
@@ -887,10 +904,12 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   </figure>
   <p>The scalar becomes a gradient through the <strong>group-relative advantage</strong>: for a group of
   <math><mi>G</mi></math> completions, normalize each reward within the group,</p>
-  <math display="block"><mrow><msub><mi>A</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>−</mo><mi>mean</mi><mo>(</mo><mi>r</mi><mo>)</mo></mrow><mrow><mi>std</mi><mo>(</mo><mi>r</mi><mo>)</mo></mrow></mfrac></mrow></math>
-  <p>The group mean is the baseline — no separate value network needed. Those advantages enter GRPO's
-  <strong>clipped surrogate objective</strong> (with <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math>
-  here there is no KL-to-reference term):</p>
+  <math display="block"><mrow><msub><mi>A</mi><mi>i</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>r</mi><mi>i</mi></msub><mo>−</mo><mi>mean</mi><mo>(</mo><mi>r</mi><mo>)</mo></mrow><mrow><mi>std</mi><mo>(</mo><mi>r</mi><mo>)</mo><mo>+</mo><mi>ε</mi></mrow></mfrac></mrow></math>
+  <p>The group mean is the baseline — no separate value network needed. A small but non-zero standard
+  deviation does <em>not</em> by itself erase the signal: normalization scales the reward differences back
+  up. When every reward in a group is identical, however, every numerator is exactly zero. Those advantages
+  enter GRPO's <strong>clipped surrogate objective</strong> (with
+  <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math> here there is no KL-to-reference term):</p>
   <math display="block"><mrow><mi>𝒥</mi><mo>(</mo><mi>θ</mi><mo>)</mo><mo>=</mo><mi>𝔼</mi><mo>[</mo><mfrac><mn>1</mn><mi>G</mi></mfrac><munderover><mo>∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>G</mi></munderover><mfrac><mn>1</mn><mrow><mo>|</mo><msub><mi>o</mi><mi>i</mi></msub><mo>|</mo></mrow></mfrac><munder><mo>∑</mo><mi>t</mi></munder><mi>min</mi><mo>(</mo><msub><mi>ρ</mi><mrow><mi>i</mi><mi>t</mi></mrow></msub><msub><mi>A</mi><mi>i</mi></msub><mo>,</mo><mi>clip</mi><mo>(</mo><msub><mi>ρ</mi><mrow><mi>i</mi><mi>t</mi></mrow></msub><mo>,</mo><mn>1</mn><mo>−</mo><mi>ε</mi><mo>,</mo><mn>1</mn><mo>+</mo><mi>ε</mi><mo>)</mo><msub><mi>A</mi><mi>i</mi></msub><mo>)</mo><mo>]</mo></mrow></math>
   <p>where <math><mrow><msub><mi>ρ</mi><mrow><mi>i</mi><mi>t</mi></mrow></msub><mo>=</mo><msub><mi>π</mi><mi>θ</mi></msub><mo>/</mo><msub><mi>π</mi><mi>old</mi></msub></mrow></math>
   is the importance ratio. The <em>sign</em> of the advantage sets the direction — raise the probability of
@@ -905,15 +924,16 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   <p>No gold tokens are involved — only the policy re-weighting its own samples. That design has a sharp failure
   mode; here it is, live:</p>
   <figure class="fig reveal" id="fig-rollout">
-    <div class="fig-title">grpo · a group of 8, and why it can stall</div>
+    <div class="fig-title">grpo · a group of 8, from differences to a tie</div>
     <div class="sliderrow">SFT quality (how good the policy already is) <input type="range" id="rollout-range" min="0" max="100" value="30"><span class="val" id="rollout-val">30%</span></div>
     <div class="controls"><button class="btn" id="rollout-resample">↻ resample group</button></div>
     <svg id="rollout-svg" width="520" height="210" viewBox="0 0 520 210" role="img" aria-label="grpo rollout group"></svg>
     <div class="stats"><div class="stat"><div class="k">mean reward</div><div class="v" id="rollout-mean">—</div></div>
       <div class="stat"><div class="k">reward std</div><div class="v" id="rollout-std">—</div></div>
       <div class="stat accent"><div class="k">usable gradient</div><div class="v" id="rollout-grad">—</div></div></div>
-    <figcaption>Crank "SFT quality" up: the 8 rewards bunch near the top, <b>std → 0</b>, every advantage → 0,
-    and the gradient vanishes. A strong SFT starting point <em>saturates</em> the reward.</figcaption>
+    <figcaption>Crank "SFT quality" up: more completions receive the same maximum reward. Unequal rewards retain
+    normalized advantages even when their spread is small; once all 8 tie, <b>std = 0</b>, every numerator is
+    zero, and this group supplies no policy-gradient signal.</figcaption>
   </figure>
   <p>That isn't a thought experiment — it's what the real run shows. The reward starts near 0.99 and the
   fraction of prompts with <em>zero</em> reward variance climbs to 100%:</p>
@@ -927,15 +947,18 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
     climbs to <b>100%</b>. The reward has no headroom left for RL to climb.</figcaption>
   </figure>
   <div class="callout"><div class="ct">the lesson</div>GRPO moved macro pair_f1 by <b>−0.007</b> here — flat.
-  Not a failure of RL, but of a reward the SFT model already maxes out. RL needs <em>headroom</em> and
-  <em>reward variance</em> to bite. To see RL actually <em>work</em>, give it a model with room to grow.</div>
+  Not a failure of RL, but of a reward that often assigns the SFT model's samples identical scores. GRPO
+  needs the reward to <em>distinguish completions within a group</em>. A separate run shows what training can
+  look like before those ties dominate.</div>
 
   <h3 id="s8gemma">The other half of the story: RL with headroom</h3>
-  <p>Point the <em>same</em> GRPO recipe at a model that has room to grow and it behaves completely
-  differently. Here is a <strong>Gemma-3 base</strong> that, cold, emits <b>zero valid JSON</b> (reward ≈ 0) —
-  no SFT warmup, reward-only. Scrub the 1000 logged training steps and read the model's own best rollout — and,
-  once it starts producing real extractions, the <em>actual receipt</em> it was reading — as it learns to be
-  coherent:</p>
+  <p>A separate GRPO run on <strong>Gemma-4-E2B base</strong> starts cold, emitting <b>zero valid JSON</b>
+  (reward ≈ 0), and eventually learns coherent extractions. This is not a controlled comparison with Qwen:
+  both use 8 generations, <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math>, and the same learning
+  rate, but Gemma trains for <b>1000 vs. 250</b> steps, allows <b>2048 vs. 768</b> completion tokens, uses a
+  primed <code>&lt;think&gt;</code> format, and adds a format component to the reward. Scrub the logged
+  training steps and read the model's own best rollout — and, once it starts producing real extractions,
+  the <em>actual receipt</em> it was reading:</p>
   <figure class="fig reveal" id="fig-gemrl">
     <div class="fig-title">gemma base · reward climbs from zero as the output becomes coherent</div>
     <div class="controls"><button class="btn pri" id="gem-play">▶ play training</button>
@@ -948,11 +971,11 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
     </div>
     <figcaption id="gem-cap"></figcaption>
   </figure>
-  <div class="take"><div class="ct">the RL lesson, both ways</div>Same algorithm, opposite outcomes. On Qwen
-  (already strong) GRPO was flat — <b>no reward variance, no gradient</b>. On Gemma base (weak) the very same
-  GRPO climbs from <b>0 → 100% valid JSON, macro pair_f1 0.73</b>, because there was headroom and the reward
-  could still discriminate good from bad. RL doesn't conjure capability; it <em>amplifies</em> what the reward
-  can still see.</div>
+  <div class="take"><div class="ct">what these two runs show</div>Qwen's already-strong samples often tied at
+  the maximum reward, and its GRPO stage was flat. In the separate Gemma run, reward climbed from
+  <b>0 → 100% valid JSON, macro pair_f1 0.73</b>. The result is consistent with useful reward discrimination
+  early in training, but the changed model, prompt, reward, completion budget, and step count mean it does
+  <em>not</em> isolate headroom as the sole cause.</div>
   <details class="deep"><summary>Go deeper: decoding — how those completions are sampled</summary><div class="dbody">
     <p>Each rollout is autoregressive generation: a multimodal <b>prefill</b> (splice image tokens, run the
     decoder once to fill the KV-cache) then a <b>decode loop</b> that samples one token at a time. Sampling
@@ -1118,7 +1141,7 @@ Here is the correct extraction for reference:
     <thead><tr><th>method</th><th>loss</th><th>target the token is pulled toward</th><th>signal from</th><th>fails when</th></tr></thead>
     <tbody>
       <tr><td><b>SFT</b></td><td>cross-entropy</td><td>one-hot gold token</td><td>human labels</td><td>only one right answer; can overfit &amp; forget</td></tr>
-      <tr><td><b>GRPO</b></td><td>clipped policy-gradient</td><td><em>no fixed target</em> — re-weight own samples by advantage</td><td>a scalar reward</td><td>reward saturates → zero variance → no gradient</td></tr>
+      <tr><td><b>GRPO</b></td><td>clipped policy-gradient</td><td><em>no fixed target</em> — re-weight own samples by advantage</td><td>a scalar reward</td><td>all group rewards tie → zero advantage</td></tr>
       <tr><td><b>GKD</b></td><td>generalized JSD</td><td>a bigger teacher's full distribution</td><td>a separate teacher</td><td>need a teacher; vocab &amp; image tokens must match</td></tr>
       <tr><td><b>SDFT</b></td><td>JSD (self-teacher)</td><td>the base model's demo-informed distribution</td><td>the model itself + a demonstration</td><td>modest peak; base must already be competent</td></tr>
     </tbody>
@@ -1192,7 +1215,7 @@ Here is the correct extraction for reference:
     <li><a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Attention Is All You Need</a> — attention and sinusoidal position encoding.</li>
     <li><a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noreferrer">RoFormer</a> — rotary position embedding.</li>
     <li><a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noreferrer">GQA</a> and <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">FlashAttention</a>.</li>
-    <li><a href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noreferrer">Vision Transformer</a> and <a href="https://arxiv.org/abs/2502.14786" target="_blank" rel="noreferrer">SigLIP 2</a>.</li>
+    <li><a href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noreferrer">Vision Transformer</a>, <a href="https://arxiv.org/abs/2303.15343" target="_blank" rel="noreferrer">SigLIP</a>, and <a href="https://arxiv.org/abs/2502.14786" target="_blank" rel="noreferrer">SigLIP 2</a>.</li>
     <li><a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">LoRA</a>.</li>
     <li><a href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noreferrer">DeepSeekMath</a> — GRPO.</li>
     <li><a href="https://arxiv.org/abs/2306.13649" target="_blank" rel="noreferrer">On-Policy Distillation</a> and the <a href="https://huggingface.co/docs/trl/main/gkd_trainer" target="_blank" rel="noreferrer">TRL GKD docs</a>.</li>
@@ -1829,11 +1852,11 @@ W(function(){var svg=document.getElementById("grpocurve-svg");onView(svg,functio
 /* ---------- LoRA ---------- */
 W(function(){
   var range=document.getElementById("lora-range"),val=document.getElementById("lora-val"),out=document.getElementById("lora-out");
-  var d=2560,layers=36,nProj=7,base=4.0e9; // Qwen3.5-4B-ish target dim + layers
+  var paramsPerRank=1327104,base=4539265536; // exact Qwen3.5-4B adapter coefficient from saved tensors
   function stat(k,v,acc){return '<div class="stat'+(acc?' accent':'')+'"><div class="k">'+k+'</div><div class="v">'+v+'</div></div>';}
   function draw(){var r=+range.value;val.textContent=r;
-    var params=2*r*d*nProj*layers; var pct=params/base*100;
-    out.innerHTML=stat("B·A shape","d×"+r+" · "+r+"×k")+stat("trainable",(params/1e6).toFixed(1)+" M",true)+stat("of base",pct.toFixed(2)+"%");}
+    var params=paramsPerRank*r,pct=params/base*100,fileMB=params*4/1e6;
+    out.innerHTML=stat("rank","r = "+r)+stat("trainable",(params/1e6).toFixed(2)+" M",true)+stat("of frozen base",pct.toFixed(2)+"%")+stat("saved fp32",fileMB.toFixed(0)+" MB");}
   range.addEventListener("input",draw);draw();
 });
 
@@ -1888,14 +1911,17 @@ W(function(){
   reroll();
   function draw(){
     var q=+range.value/100; val.textContent=(+range.value)+"%";
-    // higher quality -> rewards bunch near 1, less spread
-    var spread=0.55*(1-q)+0.02, base=0.35+0.62*q;
-    var rs=noise.map(function(z){return Math.max(0,Math.min(1,base+spread*(z-0.5)));});
+    // A stronger policy produces more perfect, tied completions. Quantization echoes the structured reward.
+    var rs=noise.map(function(z){
+      if(z<q*q)return 1;
+      var raw=0.25+0.58*q+0.55*(1-q)*(z-0.5);
+      return Math.max(0,Math.min(1,Math.round(raw*20)/20));
+    });
     var mean=rs.reduce(function(a,b){return a+b;},0)/8;
-    var std=Math.sqrt(rs.reduce(function(a,b){return a+(b-mean)*(b-mean);},0)/8);
+    var std=Math.sqrt(rs.reduce(function(a,b){return a+(b-mean)*(b-mean);},0)/7);
     svg.innerHTML="";var x0=44,bw=48,gap=10,y0=12,H=140;
     rs.forEach(function(r,i){
-      var adv=std>0.03?(r-mean)/std:0;  // near-zero std -> group is masked (real GRPO), no usable advantage
+      var adv=(r-mean)/(std+0.0001); // pinned TRL normalization; exact ties have zero numerator
       var col=adv>0.15?css("--good"):adv<-0.15?css("--bad"):css("--muted");
       var h=Math.max(2,H*r),x=x0+i*(bw+gap);
       svg.appendChild(el("rect",{x:x,y:y0+H-h,width:bw,height:h,rx:4,fill:col,opacity:.9}));
@@ -1906,7 +1932,7 @@ W(function(){
     svg.appendChild(el("line",{x1:x0-6,y1:y0+H-H*mean,x2:x0+8*(bw+gap)-gap+6,y2:y0+H-H*mean,stroke:css("--accent"),"stroke-width":1.4,"stroke-dasharray":"4 3"}));
     svg.appendChild(txt(x0-8,y0+H+14,10,css("--muted"),"end",css("--sans"))).textContent="adv:";
     meanEl.textContent=mean.toFixed(2);stdEl.textContent=std.toFixed(3);
-    var usable=std>0.05; gradEl.textContent=usable?"yes":"~0"; gradEl.style.color=usable?css("--good"):css("--bad");
+    var usable=std>1e-12; gradEl.textContent=usable?"yes":"no · tied"; gradEl.style.color=usable?css("--good"):css("--bad");
   }
   range.addEventListener("input",draw);resamp.addEventListener("click",function(){reroll();draw();});onView(svg,draw);draw();
 });
