@@ -128,6 +128,36 @@ td b{color:var(--ink)} tr:last-child td{border-bottom:none}
 .pbox.tch .ph{color:var(--accent-ink)} .pbox.good .ph{color:var(--good)} .pbox.bad .ph{color:var(--bad)}
 .pbox.good{border-color:color-mix(in srgb,var(--good) 45%,var(--line-2))} .pbox.bad{border-color:color-mix(in srgb,var(--bad) 45%,var(--line-2))}
 .pbody{padding:.7rem;font-family:var(--mono);font-size:.76rem;line-height:1.5;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+.ds-layout{display:grid;grid-template-columns:minmax(210px,.78fr) minmax(0,1.22fr);gap:1.1rem;align-items:start}
+.ds-media{min-width:0}
+.ds-image-frame{height:390px;display:flex;align-items:center;justify-content:center;background:var(--ground);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.ds-image-frame img{display:block;width:100%;height:100%;object-fit:contain}
+.ds-meta{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem .7rem;margin:.65rem 0 0;font-family:var(--sans)}
+.ds-badge{font-size:.7rem;font-weight:680;letter-spacing:.06em;text-transform:uppercase;color:var(--img);background:var(--img-soft);border-radius:5px;padding:.15rem .38rem}
+.ds-meta strong{font-size:.84rem;color:var(--ink)}
+.ds-detail{min-width:0}
+.ds-task{font-family:var(--sans);font-size:.82rem;line-height:1.48;color:var(--ink-2);min-height:2.5rem;margin:0 0 .7rem}
+#ds-view{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
+#ds-view button{min-width:0;white-space:normal;line-height:1.2}
+.ds-panel{border-top:1px solid var(--line);margin-top:.8rem;padding-top:.8rem;min-height:305px}
+.ds-panel-title{font-family:var(--sans);font-size:.72rem;font-weight:650;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+.ds-fields{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.65rem}
+.ds-field{font-family:var(--mono);font-size:.68rem;color:var(--ink-2);background:var(--ground);border:1px solid var(--line-2);border-radius:6px;padding:.28rem .42rem;cursor:pointer}
+.ds-field:hover,.ds-field.on{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
+.ds-focus{display:grid;grid-template-columns:minmax(90px,.65fr) minmax(0,1.35fr);gap:.6rem;border-left:3px solid var(--accent);padding:.5rem .65rem;margin:.55rem 0;background:color-mix(in srgb,var(--accent-soft) 38%,var(--ground));font-family:var(--mono);font-size:.72rem;line-height:1.45}
+.ds-focus span{color:var(--accent-ink);overflow-wrap:anywhere}.ds-focus b{font-weight:560;color:var(--ink);overflow-wrap:anywhere}
+.ds-code{margin:.65rem 0 0;padding:.7rem .75rem;max-height:230px;overflow:auto;background:var(--ground);border:1px solid var(--line);border-radius:8px;font-family:var(--mono);font-size:.7rem;line-height:1.48;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+.ds-flow{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:.35rem;margin:.2rem 0 .7rem}
+.ds-flow span{display:flex;align-items:center;justify-content:center;text-align:center;min-height:46px;border:1px solid var(--line);border-radius:7px;background:var(--ground);padding:.35rem;font-family:var(--sans);font-size:.7rem;line-height:1.25;color:var(--ink-2)}
+.ds-flow .image{color:var(--img);border-color:color-mix(in srgb,var(--img) 45%,var(--line));background:var(--img-soft);min-width:62px}
+.ds-score-controls{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.6rem}
+.ds-score-note{font-family:var(--sans);font-size:.76rem;line-height:1.45;color:var(--muted);margin:.55rem 0 0}
+@media(max-width:680px){
+  .ds-layout{grid-template-columns:1fr}
+  .ds-image-frame{height:min(390px,70vh)}
+  .ds-panel{min-height:0}
+  .ds-focus{grid-template-columns:1fr}
+}
 .demo{background:var(--good-soft);color:var(--good);border-radius:6px;padding:.2rem .3rem;transition:opacity .3s;display:block;margin-top:.3rem}
 .demo.hidden{opacity:.14;filter:grayscale(1)}
 .diffwrong{background:var(--bad-soft);color:var(--bad);border-radius:4px;padding:0 .15em}
@@ -788,7 +818,42 @@ labels[-<span class="s">1</span>] = -<span class="s">100</span></pre>
   <h2>Four ways to teach a VLM</h2>
   <p style="color:var(--ink-2)">Switch tasks: fine-tune a <strong>Qwen3.5-4B</strong> VLM to turn a receipt
   photo into structured JSON. Same task, four training signals — each a real script, each evaluated the
-  same way. We'll thread one receipt through all of them.</p>
+  same way. Before comparing the training methods, inspect what one row of that task actually contains.</p>
+  <figure class="fig reveal" id="fig-dataset">
+    <div class="fig-title">dataset explorer · receipt image → structured target</div>
+    <div class="controls">
+      <div class="seg" id="ds-sample" role="group" aria-label="Dataset sample">
+        <button class="on" data-ds="0">SROIE · 1</button>
+        <button data-ds="1">SROIE · 2</button>
+        <button data-ds="2">CORD · 1</button>
+      </div>
+      <span class="hint" id="ds-counter">sample 1 of 3</span>
+    </div>
+    <div class="ds-layout" style="margin-top:.8rem">
+      <div class="ds-media">
+        <div class="ds-image-frame"><img id="ds-image" alt=""></div>
+        <div class="ds-meta"><span class="ds-badge" id="ds-badge">SROIE</span><strong id="ds-name"></strong></div>
+      </div>
+      <div class="ds-detail">
+        <p class="ds-task" id="ds-task"></p>
+        <div class="seg" id="ds-view" role="group" aria-label="Dataset detail view">
+          <button class="on" data-view="target">Target fields</button>
+          <button data-view="prompt">Model prompt</button>
+          <button data-view="score">Evaluation</button>
+        </div>
+        <div class="ds-panel" id="ds-panel" aria-live="polite"></div>
+      </div>
+    </div>
+    <figcaption id="ds-caption"></figcaption>
+  </figure>
+  <div class="stats">
+    <div class="stat"><div class="k">input</div><div class="v">image</div></div>
+    <div class="stat accent"><div class="k">output</div><div class="v">JSON</div></div>
+    <div class="stat"><div class="k">tasks</div><div class="v">2</div></div>
+    <div class="stat"><div class="k">scoring unit</div><div class="v">leaf pair</div></div>
+  </div>
+  <p>The methods below all operate on this same image-to-JSON contract. What changes is the signal used to
+  teach the output: gold tokens, a scalar reward, a larger teacher, or the model's own distribution.</p>
   <div class="tbl" style="margin-top:1rem"><table>
     <thead><tr><th>Method</th><th>One-line idea</th><th>Learns from</th></tr></thead>
     <tbody>
@@ -798,11 +863,6 @@ labels[-<span class="s">1</span>] = -<span class="s">100</span></pre>
       <tr><td><b>Self-distillation</b></td><td>let the model teach itself from a demo</td><td>its own adapter-off distribution</td></tr>
     </tbody>
   </table></div>
-  <figure class="fig reveal" id="fig-receipt" style="text-align:center">
-    <div class="fig-title" style="justify-content:center">the running example</div>
-    <img id="receipt-img" alt="a scanned receipt" width="230" style="border-radius:8px;border:1px solid var(--line)">
-    <figcaption id="receipt-cap" style="text-align:left"></figcaption>
-  </figure>
 </div>
 
 <section class="section" id="s7">
@@ -1867,11 +1927,121 @@ function maskWidget(rowId,btnId,seq){var row=document.getElementById(rowId),btn=
 W(function(){maskWidget("mask1-row","mask1-toggle",[{t:"<image>×64",r:"img"},{t:"What",r:"p"},{t:"is",r:"p"},{t:"in",r:"p"},{t:"the",r:"p"},{t:"image",r:"p"},{t:"?",r:"p"},{t:"A",r:"ans"},{t:"cat",r:"ans"},{t:"sitting",r:"ans"},{t:"on",r:"ans"},{t:"a",r:"ans"},{t:"mat",r:"ans"},{t:".",r:"ans"}]);});
 W(function(){maskWidget("mask2-row","mask2-toggle",[{t:"<image>×475",r:"img"},{t:"Extract",r:"p"},{t:"the",r:"p"},{t:"fields",r:"p"},{t:"…schema…",r:"p"},{t:"{",r:"ans"},{t:'"company"',r:"ans"},{t:":",r:"ans"},{t:'"BOOK TA.K"',r:"ans"},{t:",",r:"ans"},{t:'"total"',r:"ans"},{t:":",r:"ans"},{t:'"9.00"',r:"ans"},{t:"}",r:"ans"}]);});
 
-/* ---------- RECEIPT + DIFF ---------- */
+/* ---------- DATASET EXPLORER + DIFF ---------- */
 W(function(){
-  document.getElementById("receipt-img").src=DATA.receipt;
-  var t=DATA.receiptTarget;
-  document.getElementById("receipt-cap").innerHTML="SROIE receipt. The gold target is four flat fields: <code>company</code>, <code>date</code>, <code>address</code>, <code>total</code> — here <b>"+(t.total||"")+"</b> from <b>"+((t.company||"").slice(0,22))+"…</b>. CORD receipts add nested line-items.";
+  var samples=[
+    {
+      dataset:"SROIE",name:"BOOK TA.K · header extraction",img:DATA.receipt,
+      alt:"SROIE receipt from BOOK TA.K",
+      task:"Read four header fields from a scanned receipt. The target is a flat object and values stay as printed.",
+      instruction:"You are a receipt information extraction system. Extract the key header fields from this scanned receipt image.",
+      schema:'{\n  "company": "string",\n  "date": "string",\n  "address": "string",\n  "total": "string"\n}',
+      target:DATA.receiptTarget,
+      caption:'SROIE contributes flat key-information extraction: <code>company</code>, <code>date</code>, <code>address</code>, and <code>total</code>.'
+    },
+    {
+      dataset:"SROIE",name:"RESTORAN WAN SHENG · header extraction",img:DATA.gemma.stages[4].img,
+      alt:"SROIE restaurant receipt",
+      task:"The schema is unchanged, but the typography, address length, date format, and merchant layout differ.",
+      instruction:"You are a receipt information extraction system. Extract the key header fields from this scanned receipt image.",
+      schema:'{\n  "company": "string",\n  "date": "string",\n  "address": "string",\n  "total": "string"\n}',
+      target:{"company":"RESTORAN WAN SHENG","date":"18-06-2018","address":"No.2, Jalan Temenggung 19/9, Seksyen 9, Bandar Mahkota Cheras, 43200 Cheras, Selangor","total":"6.50"},
+      caption:'A second SROIE row shows why this is a vision task rather than a fixed template: the same four fields appear in a different visual layout.'
+    },
+    {
+      dataset:"CORD",name:"Bakery receipt · itemized extraction",img:DATA.gemma.stages[5].img,
+      alt:"CORD bakery receipt with two line items",
+      task:"Read repeated menu items and payment totals. The target is nested; list indices are ignored during evaluation.",
+      instruction:"You are a receipt information extraction system. Extract the itemized contents of this receipt image: every menu line item (name, count, price) plus subtotal and total information.",
+      schema:'{\n  "menu": [\n    {"nm": "string", "cnt": "string", "price": "string"}\n  ],\n  "sub_total": {"subtotal_price": "string", "tax_price": "string"},\n  "total": {"total_price": "string", "cashprice": "string", "changeprice": "string"}\n}',
+      target:{"menu":[{"nm":"REDBEAN BREAD","cnt":"1","price":"9,000"},{"nm":"FRANKFRUT SAUSAGE ROLL","cnt":"1","price":"12,000"}],"total":{"total_price":"21,000","cashprice":"50,000","changeprice":"29,000"}},
+      caption:'CORD contributes nested itemized parsing. Its labels are sparse: this row has <code>menu</code> and <code>total</code>, but no annotated <code>sub_total</code>.'
+    }
+  ];
+  var sampleIndex=0,view="target",fieldIndex=0,scoreMode="exact";
+  var sampleButtons=document.querySelectorAll("#ds-sample button"),viewButtons=document.querySelectorAll("#ds-view button");
+  var image=document.getElementById("ds-image"),badge=document.getElementById("ds-badge"),name=document.getElementById("ds-name");
+  var task=document.getElementById("ds-task"),panel=document.getElementById("ds-panel"),caption=document.getElementById("ds-caption"),counter=document.getElementById("ds-counter");
+
+  function esc(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function clone(v){return JSON.parse(JSON.stringify(v));}
+  function displayLeaves(obj,prefix,out){
+    if(Array.isArray(obj)){obj.forEach(function(v,i){displayLeaves(v,prefix+"[" + i + "]",out);});return;}
+    if(obj&&typeof obj==="object"){Object.keys(obj).forEach(function(k){displayLeaves(obj[k],prefix?prefix+"."+k:k,out);});return;}
+    if(obj!==null&&obj!==undefined&&String(obj)!=="")out.push({path:prefix,value:String(obj)});
+  }
+  function norm(v){
+    var s=String(v).trim().toLowerCase().split(",").join("").split("$").join("").split("rp").join("").replace(/\s+/g," ").trim();
+    if(/^-?\d+(?:\.\d+)?$/.test(s)){var n=parseFloat(s);return n===Math.trunc(n)?String(Math.trunc(n)):String(n);}
+    return s;
+  }
+  function evalLeaves(obj,prefix,out){
+    if(Array.isArray(obj)){obj.forEach(function(v){evalLeaves(v,prefix,out);});return;}
+    if(obj&&typeof obj==="object"){Object.keys(obj).forEach(function(k){evalLeaves(obj[k],prefix?prefix+"."+k:k,out);});return;}
+    if(obj===null||obj===undefined)return;
+    var value=norm(obj);if(value!=="")out.push([prefix,value]);
+  }
+  function counts(items,keysOnly){var m=new Map();items.forEach(function(x){var k=keysOnly?x[0]:JSON.stringify(x);m.set(k,(m.get(k)||0)+1);});return m;}
+  function size(m){var n=0;m.forEach(function(v){n+=v;});return n;}
+  function overlap(a,b){var n=0;a.forEach(function(v,k){if(b.has(k))n+=Math.min(v,b.get(k));});return n;}
+  function f1(a,b){var hit=overlap(a,b),p=size(a)?hit/size(a):(size(b)?0:1),r=size(b)?hit/size(b):1;return p+r?2*p*r/(p+r):0;}
+  function score(pred,gold){
+    var pp=[],gp=[];evalLeaves(pred,"",pp);evalLeaves(gold,"",gp);
+    var pPairs=counts(pp,false),gPairs=counts(gp,false),pKeys=counts(pp,true),gKeys=counts(gp,true);
+    var keyHit=overlap(pKeys,gKeys),pairHit=overlap(pPairs,gPairs);
+    return {field:f1(pKeys,gKeys),pair:f1(pPairs,gPairs),value:keyHit?pairHit/keyHit:(size(gKeys)?0:1)};
+  }
+  function candidate(s,mode){
+    var out=clone(s.target);
+    if(mode==="wrong"){
+      if(s.dataset==="CORD")out.menu[1].price="10,000";else out.total="99.00";
+    }else if(mode==="missing"){
+      if(s.dataset==="CORD")delete out.total.cashprice;else delete out.address;
+    }
+    return out;
+  }
+  function renderTarget(s){
+    var leaves=[];displayLeaves(s.target,"",leaves);fieldIndex=Math.min(fieldIndex,leaves.length-1);
+    var focus=leaves[fieldIndex];
+    panel.innerHTML='<div class="ds-panel-title">Click a supervised leaf</div><div class="ds-fields">'+
+      leaves.map(function(x,i){return '<button class="ds-field'+(i===fieldIndex?' on':'')+'" data-field="'+i+'">'+esc(x.path)+'</button>';}).join("")+
+      '</div><div class="ds-focus"><span>'+esc(focus.path)+'</span><b>'+esc(focus.value)+'</b></div>'+
+      '<div class="ds-code">'+esc(JSON.stringify(s.target,null,2))+'</div>';
+    panel.querySelectorAll("[data-field]").forEach(function(btn){btn.addEventListener("click",function(){fieldIndex=+btn.dataset.field;renderTarget(s);});});
+  }
+  function renderPrompt(s){
+    panel.innerHTML='<div class="ds-panel-title">One user turn, three ordered parts</div>'+
+      '<div class="ds-flow"><span>task instruction</span><span class="image">receipt<br>image</span><span>required JSON schema</span></div>'+
+      '<div class="ds-code">'+esc(s.instruction)+'\n\n[IMAGE]\n\nReturn ONLY valid JSON matching this schema:\n'+esc(s.schema)+'</div>';
+  }
+  function renderScore(s){
+    var pred=candidate(s,scoreMode),m=score(pred,s.target);
+    var notes={exact:"Every normalized leaf key/value pair matches the target.",
+      wrong:"The keys still match, so field_f1 stays high; the wrong value lowers pair_f1 and value_acc.",
+      missing:"Removing a leaf lowers field coverage as well as key/value-pair overlap."};
+    panel.innerHTML='<div class="ds-panel-title">Change one candidate prediction</div><div class="ds-score-controls">'+
+      '<button class="btn'+(scoreMode==="exact"?' on':'')+'" data-score="exact">exact</button>'+
+      '<button class="btn'+(scoreMode==="wrong"?' on':'')+'" data-score="wrong">one wrong value</button>'+
+      '<button class="btn'+(scoreMode==="missing"?' on':'')+'" data-score="missing">one missing field</button></div>'+
+      '<div class="stats"><div class="stat"><div class="k">field_f1</div><div class="v">'+m.field.toFixed(2)+'</div></div>'+
+      '<div class="stat accent"><div class="k">pair_f1</div><div class="v">'+m.pair.toFixed(2)+'</div></div>'+
+      '<div class="stat"><div class="k">value_acc</div><div class="v">'+m.value.toFixed(2)+'</div></div></div>'+
+      '<p class="ds-score-note">'+notes[scoreMode]+' Values are normalized before comparison; repeated CORD items form a multiset.</p>'+
+      '<div class="ds-code">'+esc(JSON.stringify(pred,null,2))+'</div>';
+    panel.querySelectorAll("[data-score]").forEach(function(btn){btn.addEventListener("click",function(){scoreMode=btn.dataset.score;renderScore(s);});});
+  }
+  function renderPanel(s){if(view==="prompt")renderPrompt(s);else if(view==="score")renderScore(s);else renderTarget(s);}
+  function renderSample(){
+    var s=samples[sampleIndex];
+    image.src=s.img;image.alt=s.alt;badge.textContent=s.dataset;name.textContent=s.name;task.textContent=s.task;
+    caption.innerHTML=s.caption;counter.textContent="sample "+(sampleIndex+1)+" of "+samples.length;
+    sampleButtons.forEach(function(btn,i){btn.classList.toggle("on",i===sampleIndex);btn.setAttribute("aria-pressed",i===sampleIndex);});
+    viewButtons.forEach(function(btn){var on=btn.dataset.view===view;btn.classList.toggle("on",on);btn.setAttribute("aria-pressed",on);});
+    renderPanel(s);
+  }
+  sampleButtons.forEach(function(btn){btn.addEventListener("click",function(){sampleIndex=+btn.dataset.ds;fieldIndex=0;scoreMode="exact";renderSample();});});
+  viewButtons.forEach(function(btn){btn.addEventListener("click",function(){view=btn.dataset.view;renderSample();});});
+  renderSample();
 });
 W(function(){
   var gold=DATA.receiptTarget,base=DATA.baseOut;
