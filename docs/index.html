@@ -32,6 +32,8 @@ h4{font-size:1.02rem;font-weight:640;margin:1.4rem 0 .1rem;color:var(--ink)}
 p{margin:.85rem 0}
 a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
 a:hover{border-bottom-color:var(--accent)}
+.cite{font-family:var(--sans);font-size:.78em;white-space:nowrap}
+.cite::before{content:"["}.cite::after{content:"]"}
 code,kbd,.mono{font-family:var(--mono);font-size:.86em}
 p code,li code,td code,summary code{background:var(--panel);padding:.06em .34em;border-radius:5px;border:1px solid var(--line)}
 strong{font-weight:640}
@@ -149,6 +151,9 @@ details.deep .dbody>*:first-child{margin-top:0}
 .patchgrid{position:absolute;inset:0}
 .glossary dt{font-family:var(--sans);font-weight:640;font-size:.9rem;color:var(--ink);margin-top:.7rem}
 .glossary dd{margin:.1rem 0 0;font-size:.92rem;color:var(--ink-2)}
+.references{columns:1;column-gap:2rem;padding-left:1.25rem;font-size:.88rem;color:var(--ink-2)}
+.references li{break-inside:avoid;margin:0 0 .65rem}
+@media(min-width:720px){.references{columns:2}}
 .appendix{margin-top:2rem}
 kbd,.kbd{font-family:var(--mono);background:var(--panel);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:.02em .38em;font-size:.82em}
 footer{margin:4rem 0 3rem;padding-top:1.6rem;border-top:1px solid var(--line);color:var(--muted);font-family:var(--sans);font-size:.85rem}
@@ -272,7 +277,11 @@ code runs — hover, drag, and press things.</p>
   <p>The backbone is a modern (Llama-style) decoder: <strong>RMSNorm</strong>, <strong>rotary positions</strong>,
   <strong>grouped-query attention</strong>, a <strong>gated MLP</strong>, and a <strong>tied head</strong>.
   Thirty identical <em>blocks</em> stacked on a residual stream do all the work — so we look at the block
-  whole first, then open each piece.</p>
+  whole first, then open each piece. These components trace to
+  <a class="cite" href="https://arxiv.org/abs/1910.07467" target="_blank" rel="noreferrer">RMSNorm</a>,
+  <a class="cite" href="https://arxiv.org/abs/2002.05202" target="_blank" rel="noreferrer">gated linear units</a>,
+  and the decoder-only branch of the
+  <a class="cite" href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">original Transformer</a>.</p>
 
   <h3 id="s2block">The block, assembled</h3>
   <aside class="mn"><span class="mn-num">§2</span>Every sub-layer reads from and writes back to a shared
@@ -337,21 +346,70 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
     generation autoregressive. Flip to bidirectional and every patch sees every patch.</figcaption>
   </figure>
 
+  <h3 id="s2pos">How transformers represent position</h3>
+  <p>Dot-product attention alone does not attach an index to a token. The original Transformer added fixed
+  sinusoidal vectors to token embeddings; later models learned one vector per absolute index, added a
+  relative score bias, or moved position into the query/key interaction. These choices have different
+  inductive biases and different failure modes beyond the lengths seen in training.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Method</th><th>Where position enters</th><th>Useful property</th><th>Main limitation</th></tr></thead>
+    <tbody>
+      <tr><td><b>Learned absolute</b></td><td>add a trained vector <math><msub><mi>p</mi><mi>i</mi></msub></math> to each token</td><td>simple; position can specialize</td><td>finite learned table; weak extrapolation</td></tr>
+      <tr><td><b>Sinusoidal absolute</b></td><td>add fixed multi-frequency sin/cos vectors</td><td>no learned position table</td><td>absolute features must be decoded by attention</td></tr>
+      <tr><td><b>Relative bias / ALiBi</b></td><td>add a function of <math><mrow><mi>i</mi><mo>−</mo><mi>j</mi></mrow></math> to the attention logit</td><td>distance is explicit</td><td>bias shape constrains how distance is used</td></tr>
+      <tr><td><b>RoPE</b></td><td>rotate query/key channels before their dot product</td><td>relative offset enters every Q/K interaction</td><td>frequencies must extrapolate to longer contexts</td></tr>
+      <tr><td><b>NoPE</b></td><td>no explicit positional feature</td><td>zero PE parameters or arithmetic</td><td>order is inferred indirectly; results are task-dependent</td></tr>
+    </tbody>
+  </table></div>
+  <p class="hint">Primary comparisons:
+    <a class="cite" href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">sinusoidal PE</a>,
+    <a class="cite" href="https://arxiv.org/abs/2108.12409" target="_blank" rel="noreferrer">ALiBi</a>, and
+    <a class="cite" href="https://openreview.net/forum?id=Drrl2gcjzl" target="_blank" rel="noreferrer">APE/T5/ALiBi/RoPE/NoPE comparison</a>.
+  </p>
+  <details class="deep"><summary>Go deeper: NoPE and newer score-adaptive directions</summary><div class="dbody">
+    <p><b>Vanilla NoPE</b> removes explicit position features. A causal decoder is still not a bag of words:
+    token <math><mi>i</mi></math> can access a prefix of a different size than token
+    <math><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></math>, so causal masking can let position emerge
+    implicitly. Language models without PE can remain competitive in some settings
+    <a class="cite" href="https://arxiv.org/abs/2203.16634" target="_blank" rel="noreferrer">Haviv et al.</a>,
+    but that is not a guarantee of universal order or length generalization.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Direction</th><th>What changes</th><th>What the evidence says</th></tr></thead>
+      <tbody>
+        <tr><td><b>NoPE</b></td><td>remove position features entirely</td><td>strong on several algorithmic length-generalization tasks, but task-sensitive</td></tr>
+        <tr><td><b>Temperature-tuned NoPE</b></td><td>learn per-head attention temperatures</td><td>extends the otherwise limited NoPE context by reducing distracting attention</td></tr>
+        <tr><td><b>DAPE + NoPE</b></td><td>process the raw attention-score map with a small learned module</td><td>tests whether adaptive score structure can replace a fixed positional formula</td></tr>
+      </tbody>
+    </table></div>
+    <p>Recent work is better read as an active research branch than as “RoPE is obsolete”:
+    temperature tuning improves NoPE but still starts from a limited context
+    <a class="cite" href="https://arxiv.org/abs/2404.12224" target="_blank" rel="noreferrer">Wang et al., 2024</a>;
+    DAPE V2 explores learned processing of attention scores
+    <a class="cite" href="https://openreview.net/forum?id=XT1Cx6cH2a" target="_blank" rel="noreferrer">Zheng et al., 2025</a>;
+    2025 analyses study emergent local position signals and formal counting power
+    <a class="cite" href="https://arxiv.org/abs/2501.00073" target="_blank" rel="noreferrer">emergent position</a>
+    <a class="cite" href="https://arxiv.org/abs/2505.11199" target="_blank" rel="noreferrer">NoPE counting</a>.
+    None establishes a drop-in winner for every language or multimodal workload.</p>
+  </div></details>
+
   <h3>Rotary positions (RoPE)</h3>
-  <p>There are no learned position vectors. Each query/key is <em>rotated</em> by an angle proportional to
-  its position, so an attention score depends only on the <em>relative</em> distance between two tokens.</p>
+  <p>There are no learned position vectors in this backbone. RoPE rotates each query and key by its position,
+  making the <em>positional transformation</em> in their dot product a function of relative offset. The full
+  attention logit still depends on the query/key content vectors: equal offsets do not imply equal scores
+  for arbitrary token pairs.
+  <a class="cite" href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noreferrer">RoFormer</a></p>
   <figure class="fig reveal" id="fig-rope">
-    <div class="fig-title">rope · position is rotation (2-D illustration)</div>
+    <div class="fig-title">rope · same offset, content-dependent scores (2-D illustration)</div>
     <div style="display:flex;gap:1.1rem;flex-wrap:wrap;align-items:center">
-      <svg id="rope-svg" width="188" height="188" viewBox="0 0 188 188" role="img" aria-label="rotating vector"></svg>
+      <svg id="rope-svg" width="220" height="210" viewBox="0 0 220 210" role="img" aria-label="rotated query and key content vectors"></svg>
       <div style="flex:1;min-width:180px">
-        <div class="sliderrow" style="margin-bottom:.5rem">position <input type="range" id="rope-range" min="0" max="12" value="3"><span class="val" id="rope-p">3</span></div>
+        <div class="sliderrow" style="margin-bottom:.5rem">pair start <input type="range" id="rope-range" min="0" max="10" value="3"><span class="val" id="rope-p">3</span></div>
         <div class="stats">
-          <div class="stat"><div class="k">score(0,2)</div><div class="v" id="rope-a">—</div></div>
-          <div class="stat"><div class="k">score(5,7)</div><div class="v" id="rope-b">—</div></div>
+          <div class="stat"><div class="k" id="rope-a-label">score(0,2)</div><div class="v" id="rope-a">—</div></div>
+          <div class="stat"><div class="k" id="rope-b-label">score(3,5)</div><div class="v" id="rope-b">—</div></div>
         </div>
-        <p class="hint" style="margin:.6rem 0 0">Same gap (2 apart) → same score, anywhere. That
-        relative-distance property <em>is</em> RoPE.</p>
+        <p class="hint" style="margin:.6rem 0 0">Both pairs are 2 apart, so RoPE supplies the same relative
+        rotation. Their query/key content differs, so their dot-product logits usually do too.</p>
       </div>
     </div>
   </figure>
@@ -359,26 +417,31 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
     <p>RoPE applies a position-dependent rotation to <math><mi>q</mi></math> and <math><mi>k</mi></math>
     before the dot product. In 2-D, for position <math><mi>m</mi></math> and frequency <math><mi>ω</mi></math>:</p>
     <math display="block"><mrow><msub><mi>q</mi><mi>m</mi></msub><mo>=</mo><mrow><mo>(</mo><mtable><mtr><mtd><mi>cos</mi><mi>mω</mi></mtd><mtd><mo>−</mo><mi>sin</mi><mi>mω</mi></mtd></mtr><mtr><mtd><mi>sin</mi><mi>mω</mi></mtd><mtd><mi>cos</mi><mi>mω</mi></mtd></mtr></mtable><mo>)</mo></mrow><mi>q</mi></mrow></math>
-    <p>The code realizes this as <code>q·cos + rotate_half(q)·sin</code>. The magic: for two positions
-    <math><mi>m</mi></math>, <math><mi>n</mi></math> the rotated dot product depends only on
-    <math><mrow><mi>m</mi><mo>−</mo><mi>n</mi></mrow></math> — so the model generalizes to relative offsets
-    it never saw at those absolute indices.</p>
+    <p>The code realizes this as <code>q·cos + rotate_half(q)·sin</code>. For content vectors
+    <math><msub><mi>q</mi><mi>m</mi></msub></math> and
+    <math><msub><mi>k</mi><mi>n</mi></msub></math>, the score can be written
+    <math><mrow><msubsup><mi>q</mi><mi>m</mi><mi>⊤</mi></msubsup><mi>R</mi><mo>(</mo><mi>n</mi><mo>−</mo><mi>m</mi><mo>)</mo><msub><mi>k</mi><mi>n</mi></msub></mrow></math>.
+    The rotation matrix depends only on the offset; the two content vectors do not. RoPE therefore
+    incorporates explicit relative-position dependence without making every same-offset score equal.</p>
   </div></details>
 
   <h3>Grouped-query attention</h3>
   <p>Full attention keeps one key/value per query head. GQA keeps <em>fewer</em> KV heads and shares them
   across groups of query heads — big cache savings for almost no quality loss. SmolLM2-135M uses
-  <strong>9 query heads served by 3 KV heads</strong>.</p>
+  <strong>9 query heads served by 3 KV heads</strong>.
+  <a class="cite" href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noreferrer">GQA paper</a></p>
   <figure class="fig reveal" id="fig-gqa">
     <div class="fig-title">gqa · 9 queries share 3 key/value heads</div>
     <svg id="gqa-svg" width="520" height="150" viewBox="0 0 520 150" role="img" aria-label="grouped query attention"></svg>
   </figure>
 
   <h3>The KV-cache</h3>
-  <p>Generating one token at a time, you don't re-attend over the whole prefix each step. The cache stores
-  past keys/values so a new token computes only its own K/V and attends against the stored ones.</p>
+  <p>Generating one token at a time, the cache avoids recomputing the earlier tokens' keys and values.
+  The new token computes its own Q/K/V, but its query still attends over the cached prefix: standard full
+  attention remains linear in the current context length per decode step.
+  <a class="cite" href="https://huggingface.co/docs/transformers/cache_explanation" target="_blank" rel="noreferrer">HF cache docs</a></p>
   <figure class="fig reveal" id="fig-kv">
-    <div class="fig-title">kv-cache · constant work per new token</div>
+    <div class="fig-title">kv-cache · reuse prefix projections, still scan cached keys</div>
     <div class="controls">
       <button class="btn" id="kv-prefill">Prefill 4 tokens</button>
       <button class="btn pri" id="kv-add">+ generate 1</button>
@@ -386,7 +449,8 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
     </div>
     <svg id="kv-svg" width="520" height="92" viewBox="0 0 520 92" role="img" aria-label="growing kv cache"></svg>
     <figcaption id="kv-cap">Cache empty. Prefill runs the prompt once; each generated token then appends a
-    single column and reads the rest — <b>O(1)</b> new compute per step instead of O(T).</figcaption>
+    single K/V column. At prefix length <b>T</b>, projecting the new K/V is constant-size, while scoring
+    and mixing over the cached prefix is <b>O(T)</b> per layer.</figcaption>
   </figure>
 
   <h3 id="s25">The attention-variants landscape</h3>
@@ -417,14 +481,16 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
     single low-rank <em>latent</em> <math><msub><mi>c</mi><mi>t</mi></msub></math> per token and reconstructs
     each head's K,V by up-projection at attention time. The cache shrinks to the latent width (often
     &lt;10% of MHA) while keeping near-MHA quality — it decouples <em>cache size</em> from <em>head count</em>.
-    It pairs with a RoPE-compatible split so positions still work.</p>
+    It pairs with a RoPE-compatible split so positions still work.
+    <a class="cite" href="https://arxiv.org/abs/2405.04434" target="_blank" rel="noreferrer">DeepSeek-V2</a></p>
     <p><b>FlashAttention</b> changes <em>nothing</em> mathematically — it computes the exact same softmax.
     What it changes is memory traffic: the naive kernel materializes the full
     <math><mrow><mi>T</mi><mo>×</mo><mi>T</mi></mrow></math> score matrix in slow HBM; FlashAttention tiles
     Q/K/V, keeps the running softmax in fast on-chip SRAM, and never writes the big matrix out. Result:
     linear memory in <math><mi>T</mi></math> and a large speedup — which is why enabling
     <code>attn_implementation="flash_attention_2"</code> (as this repo's SFT does) matters even though the
-    outputs are identical.</p>
+    outputs are identical.
+    <a class="cite" href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">FlashAttention</a></p>
   </div></details>
 
 </section>
@@ -436,7 +502,9 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
   <em>bidirectionally</em> and uses LayerNorm + learned position embeddings, not RMSNorm + RoPE.</aside>
   <p>A Vision Transformer (SigLIP2-base/16-256) cuts a 256×256 image into 16×16 patches with a single
   strided convolution, adds position embeddings, and runs 12 transformer blocks. Out comes
-  <strong>256 patch vectors of width 768</strong>. Here's the grid it sees:</p>
+  <strong>256 patch vectors of width 768</strong>.
+  <a class="cite" href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noreferrer">ViT</a>
+  Here's the grid it sees:</p>
   <figure class="fig reveal" id="fig-patch">
     <div class="fig-title">vit · an image is a sequence of 16×16 patches</div>
     <div class="patchwrap" id="patch-wrap">
@@ -470,7 +538,8 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
   replaces it with a simple <em>pairwise sigmoid</em> loss — each pair judged independently. That's cheaper,
   scales to larger batches, and yields stronger features for small encoders. nanoVLM keeps the
   <code>vit_cls_flag=False</code> setting: <em>no</em> CLS token, so all 256 patch vectors survive — exactly
-  what the projector needs to preserve the spatial grid.</p>
+  what the projector needs to preserve the spatial grid.
+  <a class="cite" href="https://arxiv.org/abs/2502.14786" target="_blank" rel="noreferrer">SigLIP 2</a></p>
   <details class="deep"><summary>Go deeper: patch embedding, and loading pretrained weights into from-scratch code</summary><div class="dbody">
     <p>The "patchify" step is one <b>strided convolution</b>: a <code>Conv2d</code> with kernel = stride = 16
     slides over the image, and each output pixel is one patch's 768-dim embedding — <code>[3,256,256] →
@@ -610,7 +679,9 @@ labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never tr
   <math><mi>A</mi></math> and <math><mi>B</mi></math> with rank <math><mi>r</mi></math> and use</p>
   <math display="block"><mrow><msup><mi>W</mi><mi>′</mi></msup><mo>=</mo><mi>W</mi><mo>+</mo><mfrac><mi>α</mi><mi>r</mi></mfrac><mspace width="0.15em"/><mi>B</mi><mi>A</mi><mo>,</mo><mspace width="0.6em"/><mi>B</mi><mo>∈</mo><msup><mi>ℝ</mi><mrow><mi>d</mi><mo>×</mo><mi>r</mi></mrow></msup><mo>,</mo><mspace width="0.3em"/><mi>A</mi><mo>∈</mo><msup><mi>ℝ</mi><mrow><mi>r</mi><mo>×</mo><mi>k</mi></mrow></msup></mrow></math>
   <p>Since <math><mrow><mi>r</mi><mo>≪</mo><mi>d</mi><mo>,</mo><mi>k</mi></mrow></math>, the trainable count is
-  tiny. Slide the rank and watch it:</p>
+  tiny.
+  <a class="cite" href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">LoRA</a>
+  Slide the rank and watch it:</p>
   <figure class="fig reveal" id="fig-lora">
     <div class="fig-title">lora · rank vs. trainable parameters</div>
     <div class="sliderrow">rank r <input type="range" id="lora-range" min="1" max="256" step="1" value="32"><span class="val" id="lora-val">32</span></div>
@@ -675,7 +746,7 @@ labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never tr
   <h3>What a training run actually looks like</h3>
   <p>The loop is standard but the settings matter: a warmup-then-cosine learning rate, bf16, gradient
   accumulation to fake a big batch, gradient checkpointing to fit memory, and a <em>fused</em>
-  cross-entropy so the 248k-token vocabulary logits never fully materialize.</p>
+  cross-entropy so the 248,320 output logits per position never fully materialize.</p>
   <figure class="fig reveal" id="fig-sftcurves">
     <div class="fig-title">real run · SFT loss &amp; the LR schedule</div>
     <div class="pcol">
@@ -688,8 +759,13 @@ labels[is_vision_token] = -<span class="s">100</span> <span class="c"># never tr
     <b>0.20 → 0.005</b>; the LR ramps for 3% of steps then cosine-decays.</figcaption>
   </figure>
   <details class="deep"><summary>Go deeper: why liger fused cross-entropy, and gradient checkpointing</summary><div class="dbody">
-    <p>The last layer projects each of ~thousands of positions to a <b>248,077</b>-way vocabulary. Storing
-    those logits <em>and</em> their softmax gradients is gigabytes. A <b>fused</b> CE (liger kernel) computes
+    <p>The official Qwen3.5 checkpoint config pads the embedding/output dimension to <b>248,320</b> rows,
+    although its tokenizer exposes <b>248,077</b> active token IDs. The last layer therefore produces
+    248,320 logits at each of ~thousands of positions. Storing those logits <em>and</em> their softmax
+    gradients is gigabytes.
+    <a class="cite" href="https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/config.json" target="_blank" rel="noreferrer">Qwen3.5-4B config</a>
+    <a class="cite" href="https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/tokenizer_config.json" target="_blank" rel="noreferrer">tokenizer config</a>
+    A <b>fused</b> CE (liger kernel) computes
     the loss and gradient in chunks without ever holding the full logits tensor — often the difference
     between fitting and OOM on a 4B VLM. <b>Gradient checkpointing</b> trades compute for memory the other
     way: it discards activations on the forward pass and recomputes them during backward, cutting activation
@@ -711,7 +787,9 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   fields and CORD's nested items comparable with one code path.</aside>
   <p>SFT imitates one gold answer. GRPO samples several completions per prompt, <strong>scores each with a
   reward</strong>, and pushes the policy toward the above-average ones. The reward blends validity, field
-  coverage, and value correctness:</p>
+  coverage, and value correctness.
+  <a class="cite" href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noreferrer">DeepSeekMath / GRPO</a>
+  The workshop reward is:</p>
   <div class="eq"><span class="frac">0.30</span>·parsable + <span class="frac">0.50</span>·field_f1 + <span class="frac">0.20</span>·value_acc</div>
   <p>Type a prediction and watch it — the scoring is the exact trainer algorithm, ported to JavaScript:</p>
   <figure class="fig reveal" id="fig-reward">
@@ -816,12 +894,15 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   <div class="snum">Section 9 · Distillation</div>
   <h2>On-policy distillation (GKD)</h2>
   <aside class="mn"><span class="mn-num">§9</span>Both models are the same Qwen3.5 family — identical
-  248,077-token vocab and identical image tokenization (a receipt → the same 475 <code>&lt;image_pad&gt;</code>
-  tokens). That's what makes one <code>input_ids</code> scorable by teacher and student.</aside>
+  tokenizers (248,077 active IDs), identical padded model vocab dimensions (248,320), and identical image
+  tokenization (a receipt → the same 475 <code>&lt;image_pad&gt;</code> tokens). That's what makes one
+  <code>input_ids</code> and full next-token distribution compatible across teacher and student.</aside>
   <p>We have a strong 4B extractor. Can a <strong>5× smaller 0.8B</strong> student inherit most of it? In
   on-policy GKD the student <em>samples</em> a completion; both student and the frozen 4B teacher score those
   tokens; and a generalized Jensen–Shannon divergence pulls the student's distribution toward the teacher's.
-  The teacher's <em>full distribution</em> is a far richer signal than one gold label.</p>
+  The teacher's <em>full distribution</em> is a far richer signal than one gold label.
+  <a class="cite" href="https://arxiv.org/abs/2306.13649" target="_blank" rel="noreferrer">GKD paper</a>
+  <a class="cite" href="https://huggingface.co/docs/trl/main/gkd_trainer" target="_blank" rel="noreferrer">TRL GKD docs</a></p>
   <h3>The loss: matching a distribution, not a label</h3>
   <p>SFT's target is a one-hot vector — all mass on the gold token. Distillation's target is the teacher's
   <em>entire</em> next-token distribution, and the loss is a <strong>KL divergence</strong> that pulls the
@@ -844,15 +925,19 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
     <canvas id="beta-canvas" width="520" height="200" style="margin-top:.6rem;width:100%;border-radius:8px"></canvas>
     <figcaption id="beta-cap"></figcaption>
   </figure>
-  <math display="block"><mrow><mi>ℒ</mi><mo>=</mo><mi>β</mi><mspace width="0.15em"/><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mspace width="0.15em"/><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math>
+  <math display="block"><mrow><msub><mi>m</mi><mi>β</mi></msub><mo>=</mo><mi>β</mi><mi>t</mi><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mi>s</mi><mo>,</mo><mspace width="1em"/><msub><mi>JSD</mi><mi>β</mi></msub><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo><mo>=</mo><mi>β</mi><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><msub><mi>m</mi><mi>β</mi></msub><mo>)</mo><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><msub><mi>m</mi><mi>β</mi></msub><mo>)</mo></mrow></math>
   <p>with <math><mi>t</mi></math> the teacher and <math><mi>s</mi></math> the student distribution over the
-  next token. <math><mrow><mi>β</mi><mo>=</mo><mn>0.5</mn></mrow></math> is the symmetric JS divergence.</p>
+  next token. <math><mrow><mi>β</mi><mo>=</mo><mn>0.5</mn></mrow></math> is the symmetric JSD. TRL
+  special-cases the endpoints: <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math> is forward
+  <math><mrow><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo></mrow></math>, and
+  <math><mrow><mi>β</mi><mo>=</mo><mn>1</mn></mrow></math> is reverse
+  <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math>.</p>
   <details class="deep"><summary>Go deeper: forward vs reverse KL, and why on-policy</summary><div class="dbody">
     <p><b>Forward KL</b> <math><mrow><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo></mrow></math>
-    (β→1) is <em>mode-covering</em>: the <math><mrow><mi>log</mi><mo>(</mo><mi>t</mi><mo>/</mo><mi>s</mi><mo>)</mo></mrow></math>
+    (β→0 in TRL) is <em>mode-covering</em>: the <math><mrow><mi>log</mi><mo>(</mo><mi>t</mi><mo>/</mo><mi>s</mi><mo>)</mo></mrow></math>
     term explodes wherever the teacher has mass but the student assigns ≈0, forcing the student to cover every
     teacher mode — safe, but it can smear probability onto unlikely tokens. <b>Reverse KL</b>
-    <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math> (β→0) is
+    <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math> (β→1 in TRL) is
     <em>mode-seeking</em>: the student may drop teacher modes as long as its own mass sits under the teacher —
     sharper, but it can collapse. The generalized JSD at β=0.5 interpolates. <b>On-policy</b> means the
     divergence is measured on tokens the <em>student itself</em> sampled, so training fixes the student's own
@@ -887,7 +972,9 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   <strong>multimodal RoPE (M-RoPE)</strong>: every token gets a <em>3-D</em> position
   <math><mrow><mo>(</mo><mi>t</mi><mo>,</mo><mi>h</mi><mo>,</mo><mi>w</mi><mo>)</mo></mrow></math> —
   temporal, height, width — so image patches carry their grid location and text advances in time. To assign
-  them, the model needs to know which tokens are image tokens, via <code>mm_token_type_ids</code>.</p>
+  them, the model needs to know which tokens are image tokens, via <code>mm_token_type_ids</code>.
+  <a class="cite" href="https://arxiv.org/abs/2511.21631" target="_blank" rel="noreferrer">Qwen3-VL report</a>
+  <a class="cite" href="https://huggingface.co/docs/transformers/model_doc/qwen3_5" target="_blank" rel="noreferrer">Qwen3.5 docs</a></p>
   <p>Here's the trap. TRL's GRPO and GKD loss paths were written for text and forward the model
   <em>without</em> <code>mm_token_type_ids</code>; Qwen3.5's <code>get_rope_index</code> then either errors
   or mis-positions. And you can't just reuse the tensor from generation — the loss runs on
@@ -926,7 +1013,8 @@ Here is the correct extraction for reference:
     </div>
     <figcaption>No external teacher, no reward — the supervision is a demonstration re-scored on-policy by the
     model itself. Its appeal isn't peak score but <b>learning without a teacher model</b> and <b>resisting
-    forgetting</b> (Shenfeld et&nbsp;al., "Self-Distillation Enables Continual Learning").</figcaption>
+    forgetting</b>.
+    <a class="cite" href="https://arxiv.org/abs/2601.19897" target="_blank" rel="noreferrer">SDFT paper</a></figcaption>
   </figure>
   <h3>The loss, and why it resists forgetting</h3>
   <p>The objective is the same JSD as GKD, but the teacher is the model's <em>own</em> base weights conditioned
@@ -1023,16 +1111,38 @@ Here is the correct extraction for reference:
   on-policy steps from cold.</div>
 </section>
 
+<section class="section" id="references">
+  <h2>Primary sources &amp; official docs</h2>
+  <p>Links are also placed inline at the claims they support. These are the main papers and implementation
+  references used by this workshop:</p>
+  <ol class="references">
+    <li><a href="https://arxiv.org/abs/1706.03762" target="_blank" rel="noreferrer">Attention Is All You Need</a> — attention and sinusoidal position encoding.</li>
+    <li><a href="https://arxiv.org/abs/2104.09864" target="_blank" rel="noreferrer">RoFormer</a> — rotary position embedding.</li>
+    <li><a href="https://arxiv.org/abs/2305.13245" target="_blank" rel="noreferrer">GQA</a> and <a href="https://arxiv.org/abs/2205.14135" target="_blank" rel="noreferrer">FlashAttention</a>.</li>
+    <li><a href="https://arxiv.org/abs/2010.11929" target="_blank" rel="noreferrer">Vision Transformer</a> and <a href="https://arxiv.org/abs/2502.14786" target="_blank" rel="noreferrer">SigLIP 2</a>.</li>
+    <li><a href="https://arxiv.org/abs/2106.09685" target="_blank" rel="noreferrer">LoRA</a>.</li>
+    <li><a href="https://arxiv.org/abs/2402.03300" target="_blank" rel="noreferrer">DeepSeekMath</a> — GRPO.</li>
+    <li><a href="https://arxiv.org/abs/2306.13649" target="_blank" rel="noreferrer">On-Policy Distillation</a> and the <a href="https://huggingface.co/docs/trl/main/gkd_trainer" target="_blank" rel="noreferrer">TRL GKD docs</a>.</li>
+    <li><a href="https://arxiv.org/abs/2601.19897" target="_blank" rel="noreferrer">Self-Distillation Enables Continual Learning</a> — SDFT.</li>
+    <li><a href="https://huggingface.co/docs/transformers/cache_explanation" target="_blank" rel="noreferrer">Transformers cache explanation</a>.</li>
+    <li><a href="https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/config.json" target="_blank" rel="noreferrer">Qwen3.5-4B checkpoint config</a> and <a href="https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/tokenizer_config.json" target="_blank" rel="noreferrer">tokenizer config</a>.</li>
+    <li><a href="https://arxiv.org/abs/2203.16634" target="_blank" rel="noreferrer">NoPE language models</a>, <a href="https://arxiv.org/abs/2404.12224" target="_blank" rel="noreferrer">temperature-tuned NoPE</a>, and <a href="https://openreview.net/forum?id=XT1Cx6cH2a" target="_blank" rel="noreferrer">DAPE V2</a>.</li>
+    <li><a href="https://arxiv.org/abs/2511.21631" target="_blank" rel="noreferrer">Qwen3-VL Technical Report</a> — interleaved M-RoPE.</li>
+  </ol>
+</section>
+
 <section class="section" id="glossary">
   <h2>Glossary</h2>
   <dl class="glossary">
     <dt>Token / embedding</dt><dd>A piece of text (or an image patch) mapped to a vector; the model operates on the vector sequence.</dd>
     <dt>Attention head</dt><dd>One parallel "lookup" — a set of query/key/value projections. Models run many in parallel.</dd>
-    <dt>KV-cache</dt><dd>Stored keys/values from past tokens so generation adds O(1) work per new token.</dd>
+    <dt>KV-cache</dt><dd>Stored keys/values from past tokens. It avoids recomputing their projections, but a
+    new full-attention query still scans <math><mi>T</mi></math> cached keys: O(T) attention work per layer.</dd>
     <dt>LoRA</dt><dd>Low-Rank Adaptation — train a small <math><mi>BA</mi></math> update beside frozen weights (~1% of params).</dd>
     <dt>pair_f1</dt><dd>F1 over (key, value) pairs of the extracted JSON — the headline correctness metric.</dd>
     <dt>On-policy</dt><dd>Training on sequences the current model itself generated (GRPO, GKD, SDFT), vs. teacher-forced gold (SFT).</dd>
-    <dt>JSD / KL</dt><dd>Divergences between two distributions; KL is asymmetric (mode-covering vs mode-seeking), JSD is its symmetric blend.</dd>
+    <dt>JSD / KL</dt><dd>Divergences between distributions. KL is asymmetric; forward and reverse swap
+    its arguments. JSD compares each distribution with a mixture and is symmetric when β=0.5.</dd>
   </dl>
 </section>
 
@@ -1051,11 +1161,13 @@ Here is the correct extraction for reference:
   </div></details>
   <details class="deep"><summary>C · The generalized JS divergence (GKD/SDFT)</summary><div class="dbody">
     <p>With <math><mrow><mi>m</mi><mo>=</mo><mi>β</mi><mi>t</mi><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mi>s</mi></mrow></math>
-    a mixture of teacher and student, the generalized JSD interpolates between the two KL directions.
-    <math><mrow><mi>β</mi><mo>→</mo><mn>0</mn></mrow></math> is forward KL <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math>
-    (mode-seeking for the student), <math><mrow><mi>β</mi><mo>→</mo><mn>1</mn></mrow></math> is reverse
+    a mixture of teacher and student, the generalized JSD is
+    <math><mrow><mi>β</mi><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>m</mi><mo>)</mo><mo>+</mo><mo>(</mo><mn>1</mn><mo>−</mo><mi>β</mi><mo>)</mo><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>m</mi><mo>)</mo></mrow></math>.
+    In TRL's endpoint convention, <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math> is forward
     <math><mrow><mi>KL</mi><mo>(</mo><mi>t</mi><mo>∥</mo><mi>s</mi><mo>)</mo></mrow></math> (mode-covering),
-    and <math><mrow><mi>β</mi><mo>=</mo><mn>0.5</mn></mrow></math> the symmetric JSD. For low-entropy
+    <math><mrow><mi>β</mi><mo>=</mo><mn>1</mn></mrow></math> is reverse
+    <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math> (mode-seeking),
+    and <math><mrow><mi>β</mi><mo>=</mo><mn>0.5</mn></mrow></math> is symmetric JSD. For low-entropy
     structured-JSON outputs the direction barely mattered (0.838–0.847 in the sweep).</p>
   </div></details>
   <details class="deep"><summary>D · The engineering reality: vLLM, Blackwell, and rollouts</summary><div class="dbody">
@@ -1101,11 +1213,11 @@ W(function(){var prog=document.getElementById("tprog");addEventListener("scroll"
 W(function(){
   var toc=document.getElementById("toc");
   var items=[["part1","Part I · Building"],["s1","1 · The splice"],["s2","2 · LLM backbone"],
-    ["s25","2.5 · Attention zoo"],["s3","3 · Vision (ViT)"],["s35","3.5 · Resolution"],
+    ["s2pos","2.2 · Position methods"],["s25","2.5 · Attention zoo"],["s3","3 · Vision (ViT)"],["s35","3.5 · Resolution"],
     ["s4","4 · Projector"],["s5","5 · Data & mask"],["s6","6 · Forward"],["sL","· LoRA"],
     ["part2","Part II · Teaching"],["s7","7 · SFT"],["s8","8 · GRPO"],["s9","9 · Distillation"],
     ["s95","9.5 · M-RoPE"],["s10","10 · SDFT"],["s11","11 · Compare"],
-    ["recap","· When to use"],["glossary","· Glossary"],["appendix","· Appendix"]];
+    ["recap","· When to use"],["references","· Sources"],["glossary","· Glossary"],["appendix","· Appendix"]];
   var ol=document.createElement("ol");
   items.forEach(function(it){
     if(it[0]==="part1"||it[0]==="part2"){var d=document.createElement("div");d.className="part";d.textContent=it[1];ol.appendChild(d);return;}
@@ -1192,19 +1304,38 @@ W(function(){
 
 /* ---------- RoPE ---------- */
 W(function(){
-  var svg=document.getElementById("rope-svg"),range=document.getElementById("rope-range"),pl=document.getElementById("rope-p"),aO=document.getElementById("rope-a"),bO=document.getElementById("rope-b");
-  var cx=94,cy=94,R=64,stepA=0.42;
-  function score(i,j){return Math.cos((i-j)*stepA);}
+  var svg=document.getElementById("rope-svg"),range=document.getElementById("rope-range"),
+      pl=document.getElementById("rope-p"),aO=document.getElementById("rope-a"),
+      bO=document.getElementById("rope-b"),aL=document.getElementById("rope-a-label"),
+      bL=document.getElementById("rope-b-label");
+  var cx=110,cy=100,R=68,stepA=0.42;
+  // Different indices stand in for different token-derived q/k content vectors.
+  function qContent(i){return 0.22+0.61*i+0.14*Math.sin(i*1.7);}
+  function kContent(i){return -0.36+0.39*i+0.19*Math.cos(i*1.3);}
+  function angleQ(i){return qContent(i)+i*stepA;}
+  function angleK(i){return kContent(i)+i*stepA;}
+  function score(i,j){return Math.cos(angleQ(i)-angleK(j));}
   function draw(p){svg.innerHTML="";
     svg.appendChild(el("circle",{cx:cx,cy:cy,r:R,fill:"none",stroke:css("--line-2"),"stroke-width":1}));
     svg.appendChild(el("line",{x1:cx-R-8,y1:cy,x2:cx+R+8,y2:cy,stroke:css("--line"),"stroke-width":1}));
     svg.appendChild(el("line",{x1:cx,y1:cy-R-8,x2:cx,y2:cy+R+8,stroke:css("--line"),"stroke-width":1}));
-    svg.appendChild(el("line",{x1:cx,y1:cy,x2:cx+R,y2:cy,stroke:css("--muted"),"stroke-width":2,"stroke-dasharray":"3 3",opacity:.5}));
-    var an=-p*stepA,x=cx+R*Math.cos(an),y=cy+R*Math.sin(an);
-    svg.appendChild(el("line",{x1:cx,y1:cy,x2:x,y2:y,stroke:css("--accent"),"stroke-width":3,"stroke-linecap":"round"}));
-    svg.appendChild(el("circle",{cx:x,cy:y,r:4.5,fill:css("--accent")}));}
-  function upd(){var p=+range.value;pl.textContent=p;draw(p);aO.textContent=score(0,2).toFixed(3);bO.textContent=score(5,7).toFixed(3);}
+    var aq=angleQ(p),ak=angleK(p+2);
+    var qx=cx+R*Math.cos(aq),qy=cy-R*Math.sin(aq),kx=cx+R*Math.cos(ak),ky=cy-R*Math.sin(ak);
+    svg.appendChild(el("line",{x1:cx,y1:cy,x2:qx,y2:qy,stroke:css("--accent"),"stroke-width":3,"stroke-linecap":"round"}));
+    svg.appendChild(el("circle",{cx:qx,cy:qy,r:4.5,fill:css("--accent")}));
+    svg.appendChild(el("line",{x1:cx,y1:cy,x2:kx,y2:ky,stroke:css("--img"),"stroke-width":3,"stroke-linecap":"round"}));
+    svg.appendChild(el("circle",{cx:kx,cy:ky,r:4.5,fill:css("--img")}));
+    svg.appendChild(txt(10,192,10.5,css("--accent"),"start",css("--mono"),"640")).textContent="q"+p;
+    svg.appendChild(txt(55,192,10.5,css("--img"),"start",css("--mono"),"640")).textContent="k"+(p+2);
+    svg.appendChild(txt(106,192,10,css("--muted"),"start",css("--mono"))).textContent="offset = +2";
+  }
+  function upd(){
+    var p=+range.value;pl.textContent=p+"→"+(p+2);draw(p);
+    aL.textContent="score(0,2)";bL.textContent="score("+p+","+(p+2)+")";
+    aO.textContent=score(0,2).toFixed(3);bO.textContent=score(p,p+2).toFixed(3);
+  }
   range.addEventListener("input",upd);onView(svg,upd);upd();
+  new MutationObserver(upd).observe(root,{attributes:true,attributeFilter:["data-theme"]});
 });
 
 /* ---------- GQA ---------- */
@@ -1246,7 +1377,7 @@ W(function(){
   var svg=document.getElementById("kv-svg"),cap=document.getElementById("kv-cap"),n=0,x0=14,cw=20,gap=4,y=20,h=34;
   function draw(newIdx){svg.innerHTML="";for(var i=0;i<n;i++){var isNew=i===newIdx;svg.appendChild(el("rect",{x:x0+i*(cw+gap),y:y,width:cw,height:h,rx:4,fill:isNew?css("--accent"):css("--accent-soft"),stroke:css("--accent"),"stroke-width":1.2}));}svg.appendChild(txt(x0,y+h+22,11,css("--muted"),"start",css("--mono"))).textContent="cached K/V length = "+n;}
   document.getElementById("kv-prefill").addEventListener("click",function(){n=4;draw(-1);cap.innerHTML="Prefill: the 4 prompt tokens are encoded once, filling the cache.";});
-  document.getElementById("kv-add").addEventListener("click",function(){if(n===0)n=4;n++;draw(n-1);cap.innerHTML="Generated 1 token (dark): it computed only its <b>own</b> K/V and read the "+(n-1)+" cached ones.";});
+  document.getElementById("kv-add").addEventListener("click",function(){if(n===0)n=4;n++;draw(n-1);cap.innerHTML="Generated 1 token (dark): only its K/V projections are new, but its query scores all <b>"+(n-1)+" cached keys</b> — attention work grows with prefix length.";});
   document.getElementById("kv-reset").addEventListener("click",function(){n=0;draw(-1);cap.textContent="Cache empty. Prefill runs the prompt once; each generated token then appends a single column.";});
   draw(-1);
 });
@@ -1396,10 +1527,10 @@ W(function(){
     var N=Wc,teacher=[],student=[];
     for(var i=0;i<N;i++){var x=i/N*10;
       var t=gauss(x,3,0.6)+0.85*gauss(x,7,0.6); teacher.push(t);
-      // beta=0 mode-seeking: narrow peak on tallest mode; beta=1 mode-covering: broad, both modes
+      // TRL: beta=0 forward/mode-covering; beta=1 reverse/mode-seeking.
       var seek=gauss(x,3,0.55);
       var cover=0.85*(gauss(x,3,0.9)+0.85*gauss(x,7,0.9));
-      student.push(seek*(1-beta)+cover*beta);}
+      student.push(cover*(1-beta)+seek*beta);}
     function norm(a){var mx=Math.max.apply(0,a);return a.map(function(v){return v/mx;});}
     teacher=norm(teacher);student=norm(student);
     function area(arr,color,alpha){ctx.beginPath();ctx.moveTo(0,Hc);for(var i=0;i<N;i++)ctx.lineTo(i,Hc-arr[i]*(Hc-24)-8);ctx.lineTo(N,Hc);ctx.closePath();ctx.fillStyle=color;ctx.globalAlpha=alpha;ctx.fill();ctx.globalAlpha=1;}
@@ -1408,7 +1539,7 @@ W(function(){
     area(student,dark?"#8b83ff":"#4f46e5",0.5);
     ctx.font="12px "+css("--sans");ctx.fillStyle=css("--muted");ctx.fillText("teacher (2 modes)",10,16);
     ctx.fillStyle=css("--accent-ink");ctx.fillText("student",10,32);
-    cap.innerHTML=beta<0.34?"<b>Mode-seeking</b> (β→0): the student commits to a single mode and ignores the other.":beta>0.66?"<b>Mode-covering</b> (β→1): the student spreads to cover both of the teacher's modes.":"<b>Symmetric JSD</b> (β=0.5): a balance — the default for GKD here.";
+    cap.innerHTML=beta<0.34?"<b>Forward KL · mode-covering</b> (β→0 in TRL): the student spreads across both teacher modes.":beta>0.66?"<b>Reverse KL · mode-seeking</b> (β→1 in TRL): the student can commit to one teacher mode.":"<b>Symmetric JSD</b> (β=0.5): a balance — the default for GKD here.";
   }
   range.addEventListener("input",draw);onView(cv,draw);draw();
   new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
