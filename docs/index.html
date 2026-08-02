@@ -23,7 +23,7 @@
 html{-webkit-text-size-adjust:100%;overflow-x:clip}
 body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--serif);font-size:18px;line-height:1.65;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 .wrap{max-width:76rem;margin:0 auto;padding:0 1.25rem}
-.col{max-width:var(--measure);margin:0 auto}
+.col{max-width:var(--measure);margin:0 auto;transition:max-width .22s ease}
 h1,h2,h3,h4,.eyebrow,.label,.chip,.btn,figcaption,.toc,nav,th,.stat,.mn-num,summary,.fig-title{font-family:var(--sans)}
 h2,h3,h4{text-wrap:balance;letter-spacing:-.011em;line-height:1.2}
 h2{font-size:1.72rem;font-weight:650;margin:0 0 .2rem}
@@ -50,6 +50,9 @@ math[display="block"]{display:block;margin:1rem auto;text-align:center;overflow-
 .tprog{position:absolute;left:0;bottom:-1px;height:2px;background:var(--accent);width:0}
 .themebtn{font-family:var(--sans);font-size:.8rem;border:1px solid var(--line-2);background:var(--panel);color:var(--ink-2);padding:.32rem .6rem;border-radius:7px;cursor:pointer}
 .themebtn:hover{border-color:var(--accent);color:var(--ink)}
+.toplink{font-family:var(--sans);font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--line-2);white-space:nowrap}
+.toplink:hover{color:var(--accent-ink);border-bottom-color:var(--accent)}
+@media(max-width:460px){.toplink{font-size:.72rem}.brand{max-width:7.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 header.hero{padding:3.4rem 0 1.4rem}
 .eyebrow{font-size:.76rem;font-weight:640;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink)}
 h1{font-family:var(--sans);font-size:clamp(2.1rem,5.4vw,3.25rem);line-height:1.04;letter-spacing:-.028em;font-weight:680;margin:.5rem 0 .4rem;text-wrap:balance}
@@ -57,16 +60,28 @@ h1{font-family:var(--sans);font-size:clamp(2.1rem,5.4vw,3.25rem);line-height:1.0
 .meta{font-family:var(--sans);font-size:.82rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:.35rem 1.1rem;align-items:center}
 .meta b{color:var(--ink-2);font-weight:600}
 .readtime{font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-top:.5rem}
-.toc{position:fixed;top:96px;left:max(1rem,calc((100vw - 76rem)/2 + 0.4rem));width:12.5rem;font-size:.8rem;line-height:1.35;color:var(--muted);display:none;max-height:80vh;overflow-y:auto}
+.toc{position:fixed;top:82px;left:max(1rem,calc((100vw - 76rem)/2 + 0.4rem));width:12.5rem;font-size:.8rem;line-height:1.35;color:var(--muted);display:none;max-height:calc(100vh - 100px);overflow-y:auto;transition:opacity .18s ease,transform .22s ease,visibility 0s linear 0s}
+.toc-head{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.15rem 0 .45rem;background:var(--ground);border-bottom:1px solid var(--line);font-size:.7rem;font-weight:680;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.toc-iconbtn{display:none;place-items:center;width:30px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:7px;background:var(--panel);color:var(--ink-2);font-family:var(--sans);font-size:1.15rem;line-height:1;cursor:pointer}
+.toc-iconbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
+.toc-open{position:fixed;z-index:30;top:82px;left:max(1rem,calc((100vw - 76rem)/2 + 0.4rem))}
 .toc ol{list-style:none;margin:0;padding:0}
 .toc .part{font-weight:680;color:var(--ink-2);letter-spacing:.02em;text-transform:uppercase;font-size:.72rem;margin:.9rem 0 .3rem}
 .toc a{display:block;color:var(--muted);border:none;padding:.11rem 0 .11rem .7rem;border-left:2px solid var(--line)}
 .toc a:hover{color:var(--ink)}
 .toc a.on{color:var(--accent-ink);border-left-color:var(--accent);font-weight:600}
-@media (min-width:1180px){.toc{display:block}}
+@media (min-width:1180px){
+  .toc{display:block}
+  html.js .toc .toc-iconbtn{display:grid}
+  html.js .toc-open{display:none}
+  html.toc-collapsed .toc{opacity:0;transform:translateX(-1rem);visibility:hidden;pointer-events:none;transition:opacity .18s ease,transform .22s ease,visibility 0s linear .22s}
+  html.js.toc-collapsed .toc-open{display:grid}
+  html.toc-collapsed main.wrap .col{max-width:52rem}
+}
 .mn{font-family:var(--sans);font-size:.8rem;line-height:1.42;color:var(--muted)}
 @media (min-width:1280px){.mn{position:absolute;width:14.5rem;right:-16.5rem;margin-top:.2rem}}
 @media (max-width:1279px){.mn{display:block;border-left:2px solid var(--accent);background:var(--panel);padding:.6rem .8rem;border-radius:0 8px 8px 0;margin:1rem 0}}
+@media (min-width:1280px){html.toc-collapsed .mn{position:static;width:auto;right:auto;display:block;border-left:2px solid var(--accent);background:var(--panel);padding:.6rem .8rem;border-radius:0 8px 8px 0;margin:1rem 0}}
 .mn .mn-num{color:var(--accent-ink);font-weight:640;margin-right:.35em}
 .section{position:relative;margin:3.2rem 0}
 .snum{font-family:var(--sans);font-size:.78rem;font-weight:640;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-ink)}
@@ -160,18 +175,28 @@ td b{color:var(--ink)} tr:last-child td{border-bottom:none}
 }
 .rl-layout{display:grid;grid-template-columns:minmax(260px,.95fr) minmax(0,1.05fr);gap:1rem;align-items:start}
 .rl-board{min-width:0}
-#rl-canvas{width:100%;aspect-ratio:1;background:var(--ground);border:1px solid var(--line-2);border-radius:8px;image-rendering:pixelated;touch-action:none}
+#rl-canvas{width:100%;aspect-ratio:1;background:var(--ground);border:1px solid var(--line-2);border-radius:8px;image-rendering:pixelated;touch-action:none;cursor:pointer}
 .rl-dpad{display:grid;grid-template-columns:repeat(3,38px);grid-template-rows:repeat(2,34px);justify-content:center;gap:4px;margin-top:.55rem}
 .rl-dpad button{display:flex;align-items:center;justify-content:center;width:38px;height:34px;padding:0;font-size:1rem}
 .rl-dpad [data-a="0"]{grid-column:2}.rl-dpad [data-a="2"]{grid-column:1;grid-row:2}.rl-dpad [data-a="1"]{grid-column:2;grid-row:2}.rl-dpad [data-a="3"]{grid-column:3;grid-row:2}
 .rl-inspect{min-width:0;border-left:1px solid var(--line);padding-left:1rem}
 .rl-status{font-family:var(--sans);font-size:.8rem;line-height:1.45;color:var(--ink-2);min-height:2.35rem;margin:0 0 .65rem}
 .rl-probs{margin-top:.7rem;display:grid;gap:.35rem}
-.rl-prow{display:grid;grid-template-columns:1.2rem minmax(0,1fr) 6.2rem;align-items:center;gap:.4rem;font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+.rl-policy-head{display:flex;align-items:flex-start;justify-content:space-between;gap:.7rem;padding-bottom:.5rem;border-bottom:1px solid var(--line)}
+.rl-policy-head .ds-panel-title{margin:0}
+.rl-policy-state{font-family:var(--mono);font-size:.82rem;font-weight:650;color:var(--accent-ink);margin-top:.12rem}
+.rl-policy-badge{flex:0 0 auto;font-family:var(--sans);font-size:.65rem;color:var(--muted);background:var(--panel-2);border-radius:5px;padding:.2rem .35rem;text-align:right}
+.rl-policy-summary{display:flex;justify-content:space-between;gap:.6rem;font-family:var(--sans);font-size:.7rem;color:var(--muted);margin:.08rem 0 .2rem}
+.rl-policy-summary b{color:var(--ink-2);font-weight:620}
+.rl-prow{display:grid;grid-template-columns:4rem minmax(34px,1fr) 8.2rem;align-items:center;gap:.45rem;font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+.rl-action{display:flex;align-items:center;gap:.3rem;min-width:0}.rl-action span{font-size:.9rem;color:var(--ink-2)}.rl-action em{font-style:normal;font-family:var(--sans);font-size:.67rem}
 .rl-prow b{font-weight:560;color:var(--ink-2);text-align:right}
-.rl-ptrack{height:8px;background:var(--panel-2);border-radius:4px;overflow:hidden}
-.rl-pfill{height:100%;background:var(--accent);border-radius:4px;transition:width .25s ease}
-.rl-prow.chosen{color:var(--accent-ink)}.rl-prow.chosen .rl-pfill{background:var(--good)}
+.rl-ptrack{height:9px;background:var(--panel-2);border-radius:4px;overflow:hidden}
+.rl-pfill{height:100%;background:var(--line-2);border-radius:4px;transition:width .25s ease}
+.rl-prow.best .rl-pfill{background:var(--accent)}.rl-prow.best .rl-action,.rl-prow.best b{color:var(--accent-ink)}
+.rl-prow.sampled .rl-action::after{content:"";width:5px;height:5px;border-radius:50%;background:var(--good);flex:0 0 auto}.rl-prow.sampled b{color:var(--good)}
+.rl-policy-foot{font-family:var(--sans);font-size:.66rem;line-height:1.4;color:var(--muted);padding-top:.2rem}
+.rl-policy-empty{font-family:var(--sans);font-size:.76rem;line-height:1.45;color:var(--muted);padding:.35rem 0}
 .rl-step-label{font-family:var(--mono);font-size:.72rem;color:var(--accent-ink);min-height:1.2rem;margin:.45rem 0 0}
 #rl-reward-mode,#rl-overlay{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}
 #rl-reward-mode button,#rl-overlay button{min-width:0;white-space:normal;line-height:1.2;padding:.4rem .3rem}
@@ -182,6 +207,7 @@ td b{color:var(--ink)} tr:last-child td{border-bottom:none}
   .rl-layout{grid-template-columns:1fr}
   .rl-inspect{border-left:0;border-top:1px solid var(--line);padding-left:0;padding-top:.8rem}
 }
+@media(max-width:390px){.rl-prow{grid-template-columns:3.25rem minmax(28px,1fr) 7.2rem}.rl-action em{display:none}}
 .demo{background:var(--good-soft);color:var(--good);border-radius:6px;padding:.2rem .3rem;transition:opacity .3s;display:block;margin-top:.3rem}
 .demo.hidden{opacity:.14;filter:grayscale(1)}
 .diffwrong{background:var(--bad-soft);color:var(--bad);border-radius:4px;padding:0 .15em}
@@ -271,10 +297,14 @@ footer a{color:var(--accent-ink)}
 </style></head><body><div class="topbar"><div class="wrap">
   <span class="brand">LLM <span class="dot">→</span> VLM &nbsp;workshop</span>
   <span class="spacer"></span>
+  <a class="toplink" href="./annotated-code.html">annotated source</a>
   <button class="themebtn" id="themebtn" aria-label="Toggle color theme">◐ theme</button>
 </div><div class="tprog" id="tprog"></div></div>
 
-<nav class="toc" id="toc" aria-label="Table of contents"></nav>
+<nav class="toc" id="toc" aria-label="Table of contents">
+  <div class="toc-head"><span>Sections</span><button class="toc-iconbtn" id="toc-collapse" type="button" aria-controls="toc" aria-expanded="true" aria-label="Collapse section navigation" title="Collapse section navigation">&#8249;</button></div>
+</nav>
+<button class="toc-iconbtn toc-open" id="toc-open" type="button" aria-controls="toc" aria-expanded="false" aria-label="Expand section navigation" title="Expand section navigation">&#8250;</button>
 
 <main class="wrap"><div class="col">
 
@@ -343,7 +373,8 @@ code runs — hover, drag, and press things.</p>
       <button class="btn" id="trace-reset">reset</button></div>
     <div class="tokrow" id="trace-out" style="font-size:.78rem"></div>
     <p class="hint" style="margin-top:.5rem">Batch B=2, sequence T=512, width D=576, 64 image tokens/image.
-    The head is applied only to compute the loss; a VLM backbone otherwise stays in embedding space.</p>
+    The VLM decoder returns contextual hidden states <b>[B, T, 576]</b>. Its wrapper applies the tied head
+    when vocabulary logits are needed — for the training loss or next-token generation.</p>
   </div></details>
 </section>
 
@@ -389,12 +420,37 @@ res = x;  x = res + <span class="k">mlp</span>(<span class="k">rmsnorm</span>(x)
     the computational core of the decoder, followed by a final RMSNorm and language-model head.</figcaption>
   </figure>
   <details class="deep"><summary>Go deeper: the residual stream as a communication channel</summary><div class="dbody">
-    <p>A useful mental model: the residual stream is a shared bus of width 576 that every layer reads from and
-    writes to. Attention <em>moves</em> information between token positions; the MLP <em>processes</em> it
-    within a position. Because writes are additive, later layers can read what earlier layers deposited, and a
-    sub-layer that has nothing to add can output ~0 and leave the stream unchanged. Pre-norm (normalizing the
-    <em>input</em> to each transform branch, not the residual stream itself) gives each sub-layer a controlled
-    input scale and improves optimization. It does not require the residual stream's own scale to stay constant.</p>
+    <p>A residual sub-layer learns an <em>update</em> instead of reconstructing the representation:</p>
+    <math display="block"><mrow><msub><mi>x</mi><mrow><mi>l</mi><mo>+</mo><mn>1</mn></mrow></msub><mo>=</mo><msub><mi>x</mi><mi>l</mi></msub><mo>+</mo><msub><mi>F</mi><mi>l</mi></msub><mo>(</mo><msub><mi>x</mi><mi>l</mi></msub><mo>)</mo></mrow></math>
+    <p>The unchanged term is the <b>identity path</b>; <math><msub><mi>F</mi><mi>l</mi></msub></math> is the
+    attention or MLP branch. If a branch has little to contribute, it can produce an update near zero and
+    leave useful token, position, or semantic features intact. Across depth, attention moves evidence between
+    positions and MLPs process it within each position, with both writing into the same shared stream.</p>
+    <h4>Why backpropagation gets a direct route</h4>
+    <p>Let <math><msub><mi>J</mi><mi>l</mi></msub></math> be the Jacobian of the transform branch and
+    <math><msub><mi>g</mi><mrow><mi>l</mi><mo>+</mo><mn>1</mn></mrow></msub></math> the incoming gradient.
+    Differentiating the addition gives:</p>
+    <math display="block"><mrow><mfrac><mrow><mo>∂</mo><msub><mi>x</mi><mrow><mi>l</mi><mo>+</mo><mn>1</mn></mrow></msub></mrow><mrow><mo>∂</mo><msub><mi>x</mi><mi>l</mi></msub></mrow></mfrac><mo>=</mo><mi>I</mi><mo>+</mo><msub><mi>J</mi><mi>l</mi></msub><mo>,</mo><mspace width=".8em"/><msub><mi>g</mi><mi>l</mi></msub><mo>=</mo><msup><mrow><mo>(</mo><mi>I</mi><mo>+</mo><msub><mi>J</mi><mi>l</mi></msub><mo>)</mo></mrow><mi>T</mi></msup><msub><mi>g</mi><mrow><mi>l</mi><mo>+</mo><mn>1</mn></mrow></msub></mrow></math>
+    <p>The <math><mi>I</mi></math> term carries a copy of the gradient around the nonlinear branch. In a
+    deliberately scalar toy example, suppose every branch derivative is <code>0.1</code>:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Three layers</th><th>Local derivative</th><th>Gradient multiplier</th></tr></thead>
+      <tbody>
+        <tr><td>without residuals</td><td><code>0.1</code></td><td><code>0.1³ = 0.001</code></td></tr>
+        <tr><td>with residuals</td><td><code>1 + 0.1</code></td><td><code>1.1³ = 1.331</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Without the skip, this toy chain passes only 0.1% of the final gradient multiplier to its input. With
+    the skip, the gradient is not repeatedly multiplied by the small branch derivative alone. For two residual
+    blocks, <math><mrow><mo>(</mo><mi>I</mi><mo>+</mo><msub><mi>J</mi><mn>1</mn></msub><mo>)</mo><mo>(</mo><mi>I</mi><mo>+</mo><msub><mi>J</mi><mn>0</mn></msub><mo>)</mo><mo>=</mo><mi>I</mi><mo>+</mo><msub><mi>J</mi><mn>0</mn></msub><mo>+</mo><msub><mi>J</mi><mn>1</mn></msub><mo>+</mo><msub><mi>J</mi><mn>1</mn></msub><msub><mi>J</mi><mn>0</mn></msub></mrow></math>:
+    the expansion contains an identity contribution that skips both transform branches.</p>
+    <p><b>Important caveat.</b> Residual connections improve gradient flow; they do not guarantee stable
+    gradients. Other Jacobian terms can reinforce or cancel, and repeated forward updates can increase the
+    stream's magnitude. This is why this model also uses pre-RMSNorm, careful initialization, and appropriate
+    optimization. Pre-norm controls each branch's input scale while leaving the residual identity path direct;
+    it does not force the residual stream itself to keep a constant scale.</p>
+    <p class="hint">Primary references: <a class="cite" href="https://arxiv.org/abs/1512.03385" target="_blank" rel="noreferrer">deep residual learning</a>
+    and <a class="cite" href="https://arxiv.org/abs/2002.04745" target="_blank" rel="noreferrer">pre-norm Transformer gradient analysis</a>.</p>
   </div></details>
   <details class="deep"><summary>Go deeper: embeddings, weight tying &amp; the extended vocabulary</summary><div class="dbody">
     <p>The first and last layers are a matched pair. The <b>token embedding</b> is a lookup table
@@ -1004,12 +1060,12 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
     </div>
     <div class="rl-layout" style="margin-top:.8rem">
       <div class="rl-board">
-        <canvas id="rl-canvas" width="400" height="400" tabindex="0" role="img" aria-label="Five by five reinforcement-learning gridworld"></canvas>
+        <canvas id="rl-canvas" width="400" height="400" tabindex="0" role="img" aria-keyshortcuts="W A S D" aria-label="Five by five reinforcement-learning gridworld. Select a cell to inspect it; move the agent with W A S D."></canvas>
         <div class="rl-dpad" aria-label="Manual movement controls">
-          <button class="btn" data-a="0" aria-label="Move up" title="Move up">↑</button>
-          <button class="btn" data-a="2" aria-label="Move left" title="Move left">←</button>
-          <button class="btn" data-a="1" aria-label="Move down" title="Move down">↓</button>
-          <button class="btn" data-a="3" aria-label="Move right" title="Move right">→</button>
+          <button class="btn" data-a="0" aria-label="Move up" aria-keyshortcuts="W" title="Move up (W)">↑</button>
+          <button class="btn" data-a="2" aria-label="Move left" aria-keyshortcuts="A" title="Move left (A)">←</button>
+          <button class="btn" data-a="1" aria-label="Move down" aria-keyshortcuts="S" title="Move down (S)">↓</button>
+          <button class="btn" data-a="3" aria-label="Move right" aria-keyshortcuts="D" title="Move right (D)">→</button>
         </div>
         <div class="rl-legend">
           <span><i class="rl-pixel" style="background:var(--accent)"></i> agent</span>
@@ -1537,7 +1593,17 @@ W(function(){var prog=document.getElementById("tprog");addEventListener("scroll"
 
 // TOC
 W(function(){
-  var toc=document.getElementById("toc");
+  var toc=document.getElementById("toc"),collapse=document.getElementById("toc-collapse"),open=document.getElementById("toc-open");
+  function setCollapsed(on,focusControl){
+    root.classList.toggle("toc-collapsed",on);toc.setAttribute("aria-hidden",on?"true":"false");
+    collapse.setAttribute("aria-expanded",on?"false":"true");open.setAttribute("aria-expanded",on?"false":"true");
+    try{localStorage.setItem("vlm-toc-collapsed",on?"1":"0");}catch(e){}
+    if(focusControl)(on?open:collapse).focus();
+  }
+  var initiallyCollapsed=false;try{initiallyCollapsed=localStorage.getItem("vlm-toc-collapsed")==="1";}catch(e){}
+  setCollapsed(initiallyCollapsed,false);
+  collapse.addEventListener("click",function(){setCollapsed(true,true);});
+  open.addEventListener("click",function(){setCollapsed(false,true);});
   var items=[["part1","Part I · Building"],["s1","1 · The splice"],["s2","2 · LLM backbone"],
     ["s2pos","2.2 · Position methods"],["s25","2.5 · Attention zoo"],["s3","3 · Vision (ViT)"],["s35","3.5 · Resolution"],
     ["s4","4 · Projector"],["s5","5 · Data & mask"],["s6","6 · Forward"],["sL","· LoRA"],
@@ -2246,11 +2312,12 @@ W(function(){
 /* ---------- RL POLICY PLAYGROUND ---------- */
 W(function(){
   var cv=document.getElementById("rl-canvas");if(!cv)return;
+  var game=document.getElementById("fig-rlgame");
   var ctx=cv.getContext("2d"),N=5,C=80,gamma=.97,maxSteps=24;
   var ACT=[{dx:0,dy:-1,n:"up",s:"↑"},{dx:0,dy:1,n:"down",s:"↓"},{dx:-1,dy:0,n:"left",s:"←"},{dx:1,dy:0,n:"right",s:"→"}];
   var start={x:0,y:4},goal={x:4,y:0},bonus={x:2,y:3};
   var walls=new Set(["1,1","2,1","3,3"]),hazards=new Set(["1,3","3,1"]);
-  var logits=[],values=[],episode=null,current={x:start.x,y:start.y},playing=false,updated=false;
+  var logits=[],values=[],episode=null,current={x:start.x,y:start.y},policyState={x:start.x,y:start.y},policyOrigin="start state",playing=false,updated=false;
   var episodeCount=0,selected=0,rewardMode="sparse",overlay="path",message="";
   var runBtn=document.getElementById("rl-run"),updateBtn=document.getElementById("rl-update"),trainBtn=document.getElementById("rl-train"),resetBtn=document.getElementById("rl-reset");
   var stepRange=document.getElementById("rl-step"),stepVal=document.getElementById("rl-step-val"),stepLabel=document.getElementById("rl-step-label");
@@ -2259,6 +2326,7 @@ W(function(){
   var modeButtons=document.querySelectorAll("#rl-reward-mode button"),overlayButtons=document.querySelectorAll("#rl-overlay button");
   function key(s){return s.x+","+s.y;}function ix(s){return s.y*N+s.x;}function cp(s){return{x:s.x,y:s.y};}
   function same(a,b){return a.x===b.x&&a.y===b.y;}function blocked(s){return s.x<0||s.y<0||s.x>=N||s.y>=N||walls.has(key(s));}
+  function terminal(s){return same(s,goal)||hazards.has(key(s));}
   function resetTables(){logits=[];values=[];for(var i=0;i<N*N;i++){logits.push([0,0,0,0]);values.push(0);}}
   function policy(s){
     var z=logits[ix(s)],mx=Math.max.apply(null,z),ex=z.map(function(v){return Math.exp(v-mx);}),sum=ex.reduce(function(a,b){return a+b;},0);
@@ -2276,8 +2344,8 @@ W(function(){
     return{next:next,reward:reward,terminal:terminal,outcome:outcome};
   }
   function begin(silent){
-    episode={steps:[],outcome:"playing"};current=cp(start);playing=true;updated=false;selected=0;
-    if(!silent){message="Episode in progress. Use the arrow controls, or sample a complete episode.";render();}
+    episode={steps:[],outcome:"playing"};current=cp(start);policyState=cp(start);policyOrigin="agent position";playing=true;updated=false;selected=0;
+    if(!silent){message="Episode in progress. Move manually, or sample a complete episode.";render();}
   }
   function finish(outcome,silent){
     playing=false;episode.outcome=outcome||"limit";var G=0;
@@ -2291,7 +2359,7 @@ W(function(){
   function act(a,silent){
     if(!playing)begin(silent);
     var s=cp(current),p=policy(s),tr=transition(s,a);
-    episode.steps.push({s:s,a:a,r:tr.reward,next:cp(tr.next),probs:p.slice()});current=cp(tr.next);
+    episode.steps.push({s:s,a:a,r:tr.reward,next:cp(tr.next),probs:p.slice()});current=cp(tr.next);policyState=cp(current);policyOrigin="agent position";
     if(tr.terminal)finish(tr.outcome,silent);
     else if(episode.steps.length>=maxSteps)finish("limit",silent);
     else if(!silent){message="Episode in progress · "+episode.steps.length+" transition"+(episode.steps.length===1?"":"s")+" observed.";render();}
@@ -2299,7 +2367,7 @@ W(function(){
   function runEpisode(silent){
     begin(true);
     while(playing){var p=policy(current);act(sampleAction(p),true);}
-    if(!silent)render();
+    if(!silent&&episode.steps.length){selected=0;policyState=cp(episode.steps[0].s);policyOrigin="episode step 1";render();}
   }
   function applyUpdate(silent){
     if(!episode||playing||updated||!episode.steps.length)return;
@@ -2312,20 +2380,21 @@ W(function(){
     Object.keys(targets).forEach(function(k){var t=targets[k],target=t.sum/t.n;values[k]+=.24*(target-values[k]);values[k]=Math.max(-5,Math.min(5,values[k]));});
     episode.steps.forEach(function(e){e.after=policy(e.s)[e.a];});
     updated=true;
-    if(!silent){message="Update applied. Chosen actions with positive advantage were pushed up; negative-advantage choices were pushed down.";render();}
+    if(!silent){policyState=cp(episode.steps[selected].s);policyOrigin="updated episode step";message="Update applied. Chosen actions with positive advantage were pushed up; negative-advantage choices were pushed down.";render();}
   }
   function trainMany(){
     for(var i=0;i<50;i++){runEpisode(true);applyUpdate(true);}
+    selected=0;policyState=cp(start);policyOrigin="start state after training";
     message="Trained on 50 sampled episodes. Inspect the last update or switch to the policy/value overlay.";
     render();
   }
   function fmt(v){if(v===null||v===undefined||!isFinite(v))return"—";var n=Math.abs(v)<.0005?0:v;return(n>0?"+":"")+n.toFixed(2);}
-  function drawArrow(cx,cy,a,p){
-    var len=8+14*p,w=3,x=Math.round(cx),y=Math.round(cy);ctx.fillStyle=css("--accent");ctx.globalAlpha=.35+.65*p;
-    if(a===0){ctx.fillRect(x-1,y-len,3,len);ctx.fillRect(x-5,y-len,11,3);}
-    if(a===1){ctx.fillRect(x-1,y,3,len);ctx.fillRect(x-5,y+len-3,11,3);}
-    if(a===2){ctx.fillRect(x-len,y-1,len,3);ctx.fillRect(x-len,y-5,3,11);}
-    if(a===3){ctx.fillRect(x,y-1,len,3);ctx.fillRect(x+len-3,y-5,3,11);}
+  function drawArrow(cx,cy,a,p,best){
+    var len=6+18*p,w=best?3:2,x=Math.round(cx),y=Math.round(cy),half=Math.floor(w/2);ctx.fillStyle=css(best?"--accent":"--muted");ctx.globalAlpha=(best ? .55 : .16)+.44*p;
+    if(a===0){ctx.fillRect(x-half,y-len,w,len);ctx.fillRect(x-4,y-len,9,w);}
+    if(a===1){ctx.fillRect(x-half,y,w,len);ctx.fillRect(x-4,y+len-w,9,w);}
+    if(a===2){ctx.fillRect(x-len,y-half,len,w);ctx.fillRect(x-len,y-4,w,9);}
+    if(a===3){ctx.fillRect(x,y-half,len,w);ctx.fillRect(x+len-w,y-4,w,9);}
     ctx.globalAlpha=1;
   }
   function drawRobot(s){
@@ -2345,7 +2414,10 @@ W(function(){
       if(same(s,bonus)){ctx.fillStyle=css("--amber-soft");ctx.fillRect(px+8,py+8,C-16,C-16);ctx.fillStyle=css("--amber");ctx.fillRect(px+32,py+20,16,40);ctx.fillRect(px+20,py+32,40,16);}
       if(same(s,start)){ctx.fillStyle=css("--muted");ctx.font="600 11px "+css("--sans");ctx.fillText("START",px+7,py+C-8);}
       if(overlay==="policy"&&!walls.has(k)&&!hazards.has(k)&&!same(s,goal)){
-        var p=policy(s),best=0;for(var a=1;a<4;a++)if(p[a]>p[best])best=a;drawArrow(px+C/2,py+C/2,best,p[best]);
+        var p=policy(s),best=0;for(var a=1;a<4;a++)if(p[a]>p[best])best=a;
+        var uniform=Math.max.apply(null,p)-Math.min.apply(null,p)<.002;if(uniform)best=-1;
+        for(a=0;a<4;a++)if(a!==best)drawArrow(px+C/2,py+C/2,a,p[a],false);
+        if(best>=0)drawArrow(px+C/2,py+C/2,best,p[best],true);
       }
       if(overlay==="value"&&!walls.has(k)){ctx.fillStyle=css("--ink-2");ctx.font="600 12px "+css("--mono");ctx.textAlign="center";ctx.fillText(values[ix(s)].toFixed(2),px+C/2,py+C-8);ctx.textAlign="start";}
       ctx.strokeStyle=css("--line");ctx.lineWidth=1;ctx.strokeRect(px+.5,py+.5,C-1,C-1);
@@ -2353,15 +2425,22 @@ W(function(){
     if(overlay==="path"&&episode&&episode.steps.length){
       ctx.strokeStyle=css("--accent");ctx.lineWidth=5;ctx.globalAlpha=.7;ctx.beginPath();ctx.moveTo(start.x*C+C/2,start.y*C+C/2);
       episode.steps.forEach(function(e){ctx.lineTo(e.next.x*C+C/2,e.next.y*C+C/2);});ctx.stroke();ctx.globalAlpha=1;
-      if(!playing&&episode.steps[selected]){var ss=episode.steps[selected].s;ctx.strokeStyle=css("--amber");ctx.lineWidth=4;ctx.strokeRect(ss.x*C+5,ss.y*C+5,C-10,C-10);}
     }
+    if(policyState&&!walls.has(key(policyState))){ctx.strokeStyle=css("--amber");ctx.lineWidth=4;ctx.strokeRect(policyState.x*C+5,policyState.y*C+5,C-10,C-10);}
     drawRobot(current);
   }
-  function renderProbRows(p,chosen,e){
-    probsEl.innerHTML='<div class="ds-panel-title">policy at selected state</div>'+p.map(function(v,a){
-      var now=e&&e.after!=null&&a===chosen?e.after:policy(e?e.s:start)[a],label=e&&e.after!=null&&a===chosen?Math.round(v*100)+"% → "+Math.round(now*100)+"%":Math.round(now*100)+"%";
-      return'<div class="rl-prow'+(a===chosen?' chosen':'')+'"><span>'+ACT[a].s+'</span><div class="rl-ptrack"><div class="rl-pfill" style="width:'+Math.max(2,now*100)+'%"></div></div><b>'+label+'</b></div>';
+  function renderProbRows(state,e){
+    var head='<div class="rl-policy-head"><div><div class="ds-panel-title">policy π(a | s)</div><div class="rl-policy-state">state ('+state.x+', '+state.y+')</div></div><div class="rl-policy-badge">'+policyOrigin+'</div></div>';
+    if(terminal(state)){probsEl.innerHTML=head+'<div class="rl-policy-empty">Terminal state · no next action is sampled here.</div>';return;}
+    var p=policy(state),best=0,H=0;for(var a=0;a<4;a++){if(p[a]>p[best])best=a;if(p[a]>0)H-=p[a]*Math.log(p[a]);}
+    var uniform=Math.max.apply(null,p)-Math.min.apply(null,p)<.002,compare=e&&e.after!=null&&same(e.s,state);
+    var summary='<div class="rl-policy-summary"><span>'+(uniform?'<b>uniform exploration</b>':'best <b>'+ACT[best].s+' '+ACT[best].n+' · '+(p[best]*100).toFixed(1)+'%</b>')+'</span><span>entropy <b>'+H.toFixed(2)+' / '+Math.log(4).toFixed(2)+'</b></span></div>';
+    var rows=p.map(function(now,a){var label=compare?(e.probs[a]*100).toFixed(1)+' → '+(now*100).toFixed(1)+'%':(now*100).toFixed(1)+'%';
+      var cls=(uniform?'':a===best?' best':'')+(compare&&a===e.a?' sampled':'');
+      return'<div class="rl-prow'+cls+'"><span class="rl-action"><span>'+ACT[a].s+'</span><em>'+ACT[a].n+'</em></span><div class="rl-ptrack"><div class="rl-pfill" style="width:'+Math.max(2,now*100)+'%"></div></div><b>'+label+'</b></div>';
     }).join("");
+    var foot=compare?'Before this episode update → current policy · green dot marks the sampled action.':'The policy depends on state, not step number; revisiting this state reuses this distribution.';
+    probsEl.innerHTML=head+summary+rows+'<div class="rl-policy-foot">'+foot+'</div>';
   }
   function render(){
     draw();statusEl.textContent=message;epEl.textContent=episodeCount;stepsEl.textContent=episode?episode.steps.length:0;
@@ -2372,15 +2451,15 @@ W(function(){
     if(!episode||playing||!episode.steps.length){
       stepRange.disabled=true;stepVal.textContent="—";stepLabel.textContent=playing?"Finish the episode to compute returns.":"Run or manually play an episode.";
       rewardEl.textContent=gEl.textContent=vEl.textContent=advEl.textContent="—";advEl.style.color="";
-      renderProbRows(policy(current),-1,null);return;
+      renderProbRows(policyState,null);return;
     }
     selected=Math.max(0,Math.min(selected,episode.steps.length-1));stepRange.disabled=false;stepRange.max=episode.steps.length-1;stepRange.value=selected;stepVal.textContent=(selected+1)+"/"+episode.steps.length;
     var e=episode.steps[selected];stepLabel.textContent="t="+selected+" · state ("+e.s.x+","+e.s.y+") · action "+ACT[e.a].n;
     rewardEl.textContent=fmt(e.r);gEl.textContent=fmt(e.G);vEl.textContent=fmt(e.V);advEl.textContent=fmt(e.adv);advEl.style.color=e.adv>0?css("--good"):e.adv<0?css("--bad"):css("--muted");
-    renderProbRows(e.probs,e.a,e);
+    renderProbRows(policyState,e);
   }
   function resetAll(){
-    resetTables();episode=null;current=cp(start);playing=false;updated=false;episodeCount=0;selected=0;
+    resetTables();episode=null;current=cp(start);policyState=cp(start);policyOrigin="start state";playing=false;updated=false;episodeCount=0;selected=0;
     message=rewardMode==="sparse"?"Sparse reward: only the goal and penalty tiles provide feedback.":
       rewardMode==="shaped"?"Distance shaping adds incremental feedback for moving toward the goal.":
       "The amber bonus pays on every entry, so repeatedly revisiting it can beat the intended goal.";
@@ -2389,11 +2468,12 @@ W(function(){
   runBtn.addEventListener("click",function(){runEpisode(false);});
   updateBtn.addEventListener("click",function(){applyUpdate(false);});
   trainBtn.addEventListener("click",trainMany);resetBtn.addEventListener("click",resetAll);
-  stepRange.addEventListener("input",function(){selected=+stepRange.value;render();});
+  stepRange.addEventListener("input",function(){selected=+stepRange.value;policyState=cp(episode.steps[selected].s);policyOrigin="episode step "+(selected+1);render();});
   [].forEach.call(document.querySelectorAll(".rl-dpad button"),function(b){b.addEventListener("click",function(){act(+b.dataset.a,false);});});
   modeButtons.forEach(function(b){b.addEventListener("click",function(){rewardMode=b.dataset.rm;resetAll();});});
   overlayButtons.forEach(function(b){b.addEventListener("click",function(){overlay=b.dataset.ov;render();});});
-  cv.addEventListener("keydown",function(e){var map={ArrowUp:0,ArrowDown:1,ArrowLeft:2,ArrowRight:3};if(map[e.key]!=null){e.preventDefault();act(map[e.key],false);}});
+  game.addEventListener("keydown",function(e){if(e.metaKey||e.ctrlKey||e.altKey||/input|textarea|select/i.test(e.target.tagName)||e.target.isContentEditable)return;var map={w:0,s:1,a:2,d:3},a=map[String(e.key).toLowerCase()];if(a!=null){e.preventDefault();act(a,false);}});
+  cv.addEventListener("click",function(e){var r=cv.getBoundingClientRect(),state={x:Math.floor((e.clientX-r.left)*N/r.width),y:Math.floor((e.clientY-r.top)*N/r.height)};if(state.x>=0&&state.y>=0&&state.x<N&&state.y<N&&!walls.has(key(state))){policyState=state;policyOrigin="selected cell";render();}cv.focus();});
   new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
   resetAll();
 });

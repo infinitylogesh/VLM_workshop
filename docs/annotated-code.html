@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nanoVLM annotated source · VLM workshop</title>
+  <meta name="description" content="Read nanoVLM's language model, vision transformer, modality projector, and multimodal assembly with synchronized line-by-line explanations.">
+  <script>document.documentElement.classList.add('js');try{var t=localStorage.getItem('vlm-theme');if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
+  <style>
+    :root{
+      --ground:#fbfcfd;--panel:#f3f5f8;--panel-2:#eaeef3;--ink:#14161c;--ink-2:#3a3f4b;
+      --muted:#6b7280;--line:#dbe0e8;--line-2:#c7cedb;--accent:#4f46e5;--accent-ink:#3b32c9;
+      --accent-soft:#e8e7fb;--good:#15803d;--good-soft:#dcfce7;--img:#0891b2;--img-soft:#cffafe;
+      --amber:#b45309;--amber-soft:#fef3c7;--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+      --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+    }
+    @media(prefers-color-scheme:dark){:root{
+      --ground:#0e1116;--panel:#171b22;--panel-2:#1e232c;--ink:#e7e9ee;--ink-2:#b7bdc9;
+      --muted:#8b93a1;--line:#272d38;--line-2:#333b48;--accent:#8b83ff;--accent-ink:#a49dff;
+      --accent-soft:#20213a;--good:#4ade80;--good-soft:#12291a;--img:#38bdf8;--img-soft:#0d2530;
+      --amber:#fbbf24;--amber-soft:#2a2109;
+    }}
+    :root[data-theme="light"]{--ground:#fbfcfd;--panel:#f3f5f8;--panel-2:#eaeef3;--ink:#14161c;--ink-2:#3a3f4b;--muted:#6b7280;--line:#dbe0e8;--line-2:#c7cedb;--accent:#4f46e5;--accent-ink:#3b32c9;--accent-soft:#e8e7fb;--good:#15803d;--good-soft:#dcfce7;--img:#0891b2;--img-soft:#cffafe;--amber:#b45309;--amber-soft:#fef3c7}
+    :root[data-theme="dark"]{--ground:#0e1116;--panel:#171b22;--panel-2:#1e232c;--ink:#e7e9ee;--ink-2:#b7bdc9;--muted:#8b93a1;--line:#272d38;--line-2:#333b48;--accent:#8b83ff;--accent-ink:#a49dff;--accent-soft:#20213a;--good:#4ade80;--good-soft:#12291a;--img:#38bdf8;--img-soft:#0d2530;--amber:#fbbf24;--amber-soft:#2a2109}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    html{background:var(--ground);-webkit-text-size-adjust:100%}
+    body{margin:0;color:var(--ink);background:var(--ground);font-family:var(--sans);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+    button,a{font:inherit}
+    button{color:inherit}
+    a{color:var(--accent-ink);text-decoration:none}
+    :focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+    .topbar{height:54px;display:flex;align-items:center;gap:1rem;padding:0 clamp(.8rem,2vw,1.5rem);border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--ground) 88%,transparent);backdrop-filter:blur(10px);position:sticky;top:0;z-index:30}
+    .back{display:inline-flex;align-items:center;gap:.45rem;color:var(--ink-2);font-size:.82rem;font-weight:620}
+    .back:hover{color:var(--accent-ink)}
+    .back span{font-size:1.05rem;line-height:1}
+    .brand{font-weight:680;letter-spacing:0;font-size:.88rem;padding-left:1rem;border-left:1px solid var(--line)}
+    .brand b{color:var(--accent-ink)}
+    .spacer{flex:1}
+    .source-link{font-size:.76rem;color:var(--muted);border-bottom:1px solid var(--line-2)}
+    .source-link:hover{color:var(--accent-ink);border-color:var(--accent)}
+    .themebtn,.iconbtn{border:1px solid var(--line-2);background:var(--panel);border-radius:7px;cursor:pointer;color:var(--ink-2)}
+    .themebtn{padding:.32rem .58rem;font-size:.78rem}
+    .themebtn:hover,.iconbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
+    .intro{max-width:92rem;margin:0 auto;padding:1.3rem clamp(.8rem,2vw,1.5rem) 1rem;display:flex;align-items:end;gap:2rem}
+    .intro-copy{max-width:48rem}
+    .eyebrow{color:var(--accent-ink);font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+    h1{font-size:clamp(1.55rem,3vw,2.35rem);line-height:1.08;letter-spacing:0;margin:.28rem 0 .38rem;font-weight:720}
+    .intro p{margin:0;color:var(--ink-2);font-size:.91rem;max-width:44rem}
+    .provenance{margin-left:auto;flex:0 0 auto;display:grid;gap:.22rem;text-align:right;color:var(--muted);font-size:.7rem}
+    .provenance code{font-family:var(--mono);font-size:.92em;color:var(--ink-2)}
+    .tabs-wrap{max-width:92rem;margin:0 auto;padding:0 clamp(.8rem,2vw,1.5rem)}
+    .tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line-2);border-radius:8px;overflow:hidden;background:var(--panel);max-width:58rem}
+    .tab{border:0;border-right:1px solid var(--line);background:transparent;padding:.52rem .65rem;cursor:pointer;text-align:left;min-width:0}
+    .tab:last-child{border-right:0}
+    .tab:hover{background:var(--panel-2)}
+    .tab.on{background:var(--accent);color:white}
+    .tab-name{display:block;font-family:var(--mono);font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tab-role{display:block;font-size:.63rem;opacity:.72;margin-top:.08rem}
+    .pathbar{max-width:92rem;margin:.75rem auto 0;padding:0 clamp(.8rem,2vw,1.5rem)}
+    .path{display:flex;align-items:stretch;gap:0;overflow-x:auto;scrollbar-width:thin}
+    .path-step{display:flex;align-items:center;white-space:nowrap;color:var(--muted);font-family:var(--mono);font-size:.67rem}
+    .path-step:not(:last-child)::after{content:"→";padding:0 .42rem;color:var(--line-2)}
+    .path-step.on{color:var(--accent-ink);font-weight:650}
+    .workbench{max-width:92rem;margin:.8rem auto 0;padding:0 clamp(.8rem,2vw,1.5rem) 1.5rem;display:grid;grid-template-columns:13.5rem minmax(25rem,1fr) minmax(19rem,25rem);gap:.75rem;align-items:start}
+    .pane{border:1px solid var(--line);background:var(--panel);border-radius:8px;overflow:hidden}
+    .pane-head{height:40px;display:flex;align-items:center;gap:.5rem;padding:0 .7rem;border-bottom:1px solid var(--line);background:var(--panel);font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;font-weight:680;color:var(--muted)}
+    .pane-head .count{margin-left:auto;font-family:var(--mono);font-size:.66rem;letter-spacing:0;text-transform:none;font-weight:500}
+    .outline-pane{position:sticky;top:65px}
+    .outline{padding:.42rem;display:grid;gap:.2rem;max-height:calc(100vh - 125px);overflow:auto}
+    .outline-btn{position:relative;width:100%;border:0;background:transparent;border-radius:6px;padding:.5rem .55rem .5rem .7rem;text-align:left;cursor:pointer;color:var(--ink-2)}
+    .outline-btn:hover{background:var(--panel-2)}
+    .outline-btn.on{background:var(--accent-soft);color:var(--accent-ink)}
+    .outline-btn.on::before{content:"";position:absolute;left:0;top:.38rem;bottom:.38rem;width:3px;border-radius:2px;background:var(--accent)}
+    .outline-title{display:block;font-size:.76rem;font-weight:640;line-height:1.25}
+    .outline-lines{display:block;font-family:var(--mono);font-size:.63rem;color:var(--muted);margin-top:.14rem}
+    .code-pane{background:var(--ground)}
+    .code-head{position:relative}
+    .filename{font-family:var(--mono);font-size:.71rem;letter-spacing:0;text-transform:none;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .code-actions{margin-left:auto;display:flex;align-items:center;gap:.35rem}
+    .iconbtn{width:28px;height:28px;padding:0;display:grid;place-items:center;font-size:.8rem;background:var(--ground)}
+    .code-scroll{position:relative;height:calc(100vh - 214px);min-height:430px;overflow:auto;overscroll-behavior:contain;background:var(--ground);scrollbar-color:var(--line-2) var(--ground)}
+    .code-lines{min-width:max-content;padding:.42rem 0 1rem;font-family:var(--mono);font-size:12px;line-height:1.62;counter-reset:line}
+    .code-line{display:grid;grid-template-columns:3.6rem minmax(38rem,1fr);width:100%;border:0;border-left:3px solid transparent;background:transparent;padding:0;text-align:left;color:var(--ink-2);cursor:default;line-height:inherit}
+    .code-line:hover{background:var(--panel)}
+    .code-line.annotated{border-left-color:color-mix(in srgb,var(--accent) 35%,transparent);cursor:pointer}
+    .code-line.active{background:var(--accent-soft);border-left-color:var(--accent)}
+    .code-line.active .ln{color:var(--accent-ink)}
+    .ln{padding:0 .78rem 0 .35rem;text-align:right;color:var(--muted);user-select:none;border-right:1px solid var(--line)}
+    .src{white-space:pre;padding:0 .9rem;tab-size:4;min-height:1.62em}
+    .tok-key{color:var(--accent-ink);font-weight:570}.tok-string{color:var(--good)}.tok-comment{color:var(--muted);font-style:italic}.tok-num{color:var(--amber)}
+    .loading{padding:2rem;color:var(--muted);font-size:.82rem}
+    .explain-pane{position:sticky;top:65px;background:var(--ground)}
+    .explain-scroll{max-height:calc(100vh - 106px);overflow:auto;padding:1rem;scrollbar-color:var(--line-2) var(--ground)}
+    .range{font-family:var(--mono);font-size:.68rem;color:var(--accent-ink);margin-bottom:.45rem}
+    h2{font-size:1.16rem;line-height:1.22;letter-spacing:0;margin:0 0 .55rem}
+    .summary{font-size:.84rem;line-height:1.55;color:var(--ink-2);margin:0}
+    .intuition{margin:.8rem 0 0;border-left:3px solid var(--good);background:color-mix(in srgb,var(--good-soft) 42%,var(--ground));padding:.55rem .65rem;font-size:.76rem;line-height:1.5;color:var(--ink-2)}
+    .intuition b{display:block;color:var(--good);font-size:.64rem;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.12rem}
+    .section-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:1.05rem 0 .4rem}
+    .shape-list{display:grid;gap:.3rem}
+    .shape-row{display:grid;grid-template-columns:minmax(4.5rem,.65fr) auto minmax(6rem,1fr);align-items:center;gap:.35rem;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:.43rem .5rem;font-family:var(--mono);font-size:.66rem;color:var(--ink-2)}
+    .shape-row .arrow{color:var(--muted)}
+    .shape-row b{font-weight:560;color:var(--accent-ink);overflow-wrap:anywhere}
+    .flow{display:flex;align-items:center;gap:.25rem;overflow-x:auto;padding-bottom:.2rem}
+    .flow span{display:flex;align-items:center;justify-content:center;min-height:35px;padding:.32rem .45rem;border:1px solid var(--line-2);border-radius:6px;background:var(--panel);font-family:var(--mono);font-size:.62rem;line-height:1.2;text-align:center;white-space:nowrap;color:var(--ink-2)}
+    .flow i{font-style:normal;color:var(--muted);font-size:.72rem}
+    .note{border-left:3px solid var(--amber);background:color-mix(in srgb,var(--amber-soft) 42%,var(--ground));padding:.55rem .65rem;font-size:.75rem;line-height:1.48;color:var(--ink-2)}
+    .note b{color:var(--amber)}
+    .detail{font-size:.78rem;line-height:1.52;color:var(--ink-2);margin:.4rem 0 0}
+    .detail code,.note code{font-family:var(--mono);font-size:.9em;background:var(--panel-2);padding:.06rem .25rem;border-radius:4px}
+    .pager{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:1.1rem;padding-top:.75rem;border-top:1px solid var(--line)}
+    .pager button{border:1px solid var(--line-2);background:var(--panel);border-radius:7px;padding:.45rem .55rem;cursor:pointer;font-size:.7rem;color:var(--ink-2)}
+    .pager button:hover:not(:disabled){border-color:var(--accent);color:var(--accent-ink)}
+    .pager button:disabled{opacity:.4;cursor:not-allowed}
+    .kbd-hint{margin:.65rem 0 0;color:var(--muted);font-size:.65rem;text-align:center}
+    kbd{font-family:var(--mono);font-size:.92em;border:1px solid var(--line-2);border-bottom-width:2px;background:var(--panel);border-radius:4px;padding:.04rem .25rem;color:var(--ink-2)}
+    .footer{max-width:92rem;margin:0 auto;padding:0 clamp(.8rem,2vw,1.5rem) 1.5rem;color:var(--muted);font-size:.68rem}
+    .footer a{border-bottom:1px solid var(--line-2)}
+    .sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:1080px){
+      .workbench{grid-template-columns:minmax(23rem,1.35fr) minmax(18rem,.85fr)}
+      .outline-pane{grid-column:1/-1;position:static}
+      .outline{display:flex;max-height:none;overflow-x:auto;padding:.35rem}
+      .outline-btn{flex:0 0 11.5rem}
+      .code-scroll{height:65vh}
+    }
+    @media(max-width:720px){
+      .topbar{gap:.65rem}.brand{display:none}.source-link{display:none}
+      .intro{display:block}.provenance{text-align:left;margin-top:.65rem}
+      .tabs{grid-template-columns:1fr 1fr}.tab:nth-child(2){border-right:0}.tab:nth-child(-n+2){border-bottom:1px solid var(--line)}
+      .workbench{grid-template-columns:1fr}.explain-pane{position:static}.explain-scroll{max-height:none}
+      .code-scroll{height:58vh;min-height:340px}.code-line{grid-template-columns:3rem minmax(34rem,1fr)}
+      .outline-btn{flex-basis:10rem}.pathbar{margin-top:.6rem}
+    }
+    @media(max-width:420px){.tab-role{display:none}.tab{padding:.48rem}.intro{padding-top:1rem}.workbench{padding-left:.55rem;padding-right:.55rem}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="./index.html"><span aria-hidden="true">←</span> Workshop</a>
+    <div class="brand"><b>nanoVLM</b> · annotated source</div>
+    <div class="spacer"></div>
+    <a class="source-link" href="https://github.com/infinitylogesh/nanoVLM/tree/2f16019ac7ff0392d6853c9f8f8e17dc27630c6e/models" target="_blank" rel="noreferrer">Pinned source ↗</a>
+    <button class="themebtn" id="themebtn" type="button" aria-label="Toggle color theme">◐ theme</button>
+  </header>
+
+  <section class="intro" aria-labelledby="page-title">
+    <div class="intro-copy">
+      <div class="eyebrow">Read the implementation</div>
+      <h1 id="page-title">Four files, one vision-language model</h1>
+      <p>Select a symbol or an annotated line range. The source stays on the left while shapes, data flow, and implementation details follow on the right.</p>
+    </div>
+    <div class="provenance">
+      <span>Canonical fork · <code>infinitylogesh/nanoVLM</code></span>
+      <span>Commit · <code>2f16019ac7ff</code></span>
+    </div>
+  </section>
+
+  <nav class="tabs-wrap" aria-label="Model source files"><div class="tabs" id="file-tabs" role="tablist"></div></nav>
+  <div class="pathbar" aria-label="Active file data path"><div class="path" id="data-path"></div></div>
+
+  <main class="workbench">
+    <aside class="pane outline-pane" aria-label="Symbols and annotated sections">
+      <div class="pane-head">Outline <span class="count" id="annotation-count"></span></div>
+      <div class="outline" id="outline"></div>
+    </aside>
+
+    <section class="pane code-pane" aria-label="Source code">
+      <div class="pane-head code-head">
+        <span class="filename" id="filename">models/…</span>
+        <div class="code-actions">
+          <button class="iconbtn" id="copy-link" type="button" title="Copy link to selected range" aria-label="Copy link to selected range">#</button>
+          <a class="iconbtn" id="open-source" href="#" target="_blank" rel="noreferrer" title="Open pinned source on GitHub" aria-label="Open pinned source on GitHub">↗</a>
+        </div>
+      </div>
+      <div class="code-scroll" id="code-scroll" tabindex="0" aria-label="Scrollable source code">
+        <div class="code-lines" id="code-lines"><div class="loading">Loading pinned source…</div></div>
+      </div>
+    </section>
+
+    <aside class="pane explain-pane" aria-live="polite" aria-label="Selected code explanation">
+      <div class="pane-head">Explanation <span class="count" id="selection-position"></span></div>
+      <div class="explain-scroll" id="explanation"></div>
+    </aside>
+  </main>
+
+  <footer class="footer">The displayed files are static mirrors of the pinned upstream commit. Explanations describe this implementation, not every possible VLM architecture.</footer>
+
+  <script>
+  (function(){
+    "use strict";
+    var COMMIT="2f16019ac7ff0392d6853c9f8f8e17dc27630c6e";
+    var BASE="https://github.com/infinitylogesh/nanoVLM/blob/"+COMMIT+"/models/";
+    var files={
+      "language_model.py":{
+        role:"causal decoder",path:["token IDs or embeddings","RoPE + GQA blocks","final RMSNorm","logits or features"],
+        annotations:[
+          {start:7,end:40,title:"RMSNorm",summary:"Normalizes each hidden vector by its root-mean-square magnitude, then applies one learned scale per hidden feature. It does not subtract the feature mean.",shapes:[["x","[B, T, D]"],["irms","[B, T, 1]"],["output","[B, T, D]"]],flow:["square x","mean over D","rsqrt + ε","scale x"],detail:"The normalization is computed in the incoming tensor dtype. The learned weight has shape <code>[D]</code> and broadcasts across batch and sequence axes."},
+          {start:43,end:111,title:"Rotary frequencies",summary:"Builds parameter-free sine and cosine tables for the current absolute position IDs. When the largest requested position exceeds the configured original context, this implementation divides every inverse frequency by a single linear scale factor.",intuition:"Imagine each feature pair as a clock hand rotating at its own speed. Position chooses the angles; attention compares content after those position-dependent rotations.",shapes:[["position_ids","[B, T]"],["inv_freq","[d_head / 2]"],["cos, sin","[B, T, d_head]"]],flow:["position IDs","outer product","duplicate frequencies","cos / sin"],note:"RoPE rotates query and key content. It introduces relative-position dependence into their dot product; equal offsets do not make arbitrary token-pair scores equal."},
+          {start:113,end:162,title:"Apply rotary position",summary:"Splits the last dimension into two halves, swaps them with one negation, and combines that rotated copy with sine and cosine. The operation is applied to queries and keys, not values.",shapes:[["q","[B, Hq, T, d]"],["k","[B, Hkv, T, d]"],["q′, k′","same as inputs"]],flow:["q, k","rotate_half","x·cos + rot(x)·sin","q′, k′"],detail:"Unsqueezing cosine and sine at axis 1 makes the same position rotation broadcast over all attention heads."},
+          {start:166,end:205,title:"Grouped-query attention setup",summary:"Allocates all query heads but fewer key/value heads. Several query heads therefore share one key/value head after the K and V tensors are repeated along the head axis.",intuition:"Queries are many independent readers, while a smaller set of shared K/V shelves holds what they can look up. Sharing shrinks K/V state without collapsing the query heads into one.",shapes:[["Q projection","D → Hq·d = D"],["K, V projection","D → Hkv·d"],["group count","Hq / Hkv"]],flow:["hidden state","Q / K / V projections","grouped heads"],detail:"The two assertions enforce both required divisibility conditions: query heads divide the hidden width, and KV heads divide the query-head count."},
+          {start:207,end:258,title:"QKV projection and KV cache",summary:"Projects the current chunk, rotates its Q and K tensors, then either starts a cache or appends the new rotated keys and values. Cached K/V are repeated only after concatenation to match the query-head count.",intuition:"Treat the cache as saved index cards for the prefix: the model reuses those cards, but the newest query still has to scan them to decide what matters.",shapes:[["x","[B, Tcurr, D]"],["q","[B, Hq, Tcurr, d]"],["cached k, v","[B, Hkv, Tkv, d]"],["expanded k, v","[B, Hq, Tkv, d]"]],flow:["current x","project Q/K/V","rotate Q/K","append K/V cache","repeat KV heads"],note:"Caching avoids recomputing earlier K/V projections. The new query still attends across <code>Tkv</code> cached positions, so attention work remains sequence-length dependent."},
+          {start:260,end:299,title:"Causal attention",summary:"Converts a key-padding mask to an additive mask, then uses PyTorch SDPA when available outside MPS. The manual fallback performs the same scaled dot-product, causal masking, softmax, value mixing, and output projection.",intuition:"The causal mask closes doors to future positions; the padding mask closes doors to absent tokens. Softmax distributes attention only across doors left open by both.",shapes:[["attention scores","[B, Hq, Tcurr, Tkv]"],["mixed values","[B, Hq, Tcurr, d]"],["output","[B, Tcurr, D]"]],flow:["QKᵀ / √d","padding + causal masks","softmax","weights · V","output projection"],detail:"Causal masking is enabled when <code>Tcurr == Tkv</code> and the sequence has more than one token. During cached one-token decode, the query is already at the end of the available prefix, so no future key exists in the supplied cache."},
+          {start:302,end:348,title:"Gated MLP",summary:"Runs two parallel projections into the intermediate width. One passes through SiLU and gates the other by elementwise multiplication before a down-projection returns to hidden width.",shapes:[["input","[B, T, D]"],["gate, up","[B, T, Dff]"],["output","[B, T, D]"]],flow:["x","SiLU(gate_proj)","× up_proj(x)","down_proj"],detail:"This is the SiLU-gated pattern often called SwiGLU, expressed here with three bias-free linear layers."},
+          {start:351,end:387,title:"Pre-norm residual block",summary:"Applies RMSNorm before each transform branch. Attention writes one update into the residual stream; the MLP reads that updated stream and writes a second update.",intuition:"A block edits a shared working state instead of replacing it. Attention and the MLP each read the current state and add a proposed update; the unchanged path also carries gradients backward.",shapes:[["block input","[B, T, D]"],["attention update","[B, T, D]"],["MLP update","[B, T, D]"],["block output","[B, T, D]"]],flow:["x","Norm → attention","+ residual","Norm → MLP","+ residual"],note:"For a residual update <code>y = x + F(x)</code>, backpropagation includes an identity term: <code>∂y/∂x = I + JF</code>. That direct route helps optimization, but does not guarantee stable gradients by itself."},
+          {start:390,end:417,title:"Decoder assembly and tied weights",summary:"Creates token embeddings, rotary frequencies, a stack of language blocks, final RMSNorm, and a vocabulary head. With weight tying enabled, the input embedding table and output projection reference the same parameter.",shapes:[["embedding table","[V, D]"],["residual stream","[B, T, D]"],["LM head","D → V"]],flow:["embedding","N decoder blocks","final RMSNorm","LM head"],detail:"Weight tying is literal assignment: <code>head.weight</code> is set to <code>token_embedding.weight</code>. The shared tensor is initialized through the module initialization pass."},
+          {start:419,end:480,title:"Decoder forward pass",summary:"Accepts either token IDs or already-formed embeddings, creates position IDs beginning at start_pos, computes one RoPE table for the chunk, and threads a per-block KV cache through every decoder block.",shapes:[["token mode input","[B, T]"],["embedding mode input","[B, T, D]"],["position IDs","[B, T]"],["output","[B, T, V] or [B, T, D]"]],flow:["optional embedding","position IDs + RoPE","N blocks","final norm","optional head"],note:"The VLM passes multimodal embeddings into this method. In embedding mode the decoder intentionally stops before its head, allowing <code>VisionLanguageModel</code> to apply the shared head when it needs logits."},
+          {start:483,end:535,title:"Autoregressive generation",summary:"Prefills the whole prompt once, then greedily selects one next output at a time. Each subsequent decoder call receives only that newest token or embedding plus the accumulated per-layer KV cache.",shapes:[["prefill","[B, Tprompt, …]"],["decode input","[B, 1, …]"],["result","prompt + new outputs"]],flow:["prefill prompt","take final row","argmax","append","cached one-step decode"],detail:"This helper always uses argmax. The multimodal model defines a separate generation method with greedy or top-k/top-p sampling."},
+          {start:538,end:685,title:"Load language backbone",summary:"Reads the Hugging Face config into the local configuration, downloads one or more safetensor shards, maps checkpoint names to this implementation, and handles a locally extended vocabulary before loading the state dict.",shapes:[["checkpoint embeddings","[Vbase, D]"],["extended table","[Vlocal, D]"],["new rows","normal(0, 0.02)"]],flow:["HF config","construct local LM","download shards","map tensors","extend vocab","tie weights"],note:"This is checkpoint translation, not architectural conversion. A tensor is copied only when its mapped destination exists and its shape matches, except for the explicit vocabulary-extension path."}
+        ]
+      },
+      "vision_language_model.py":{
+        role:"multimodal assembly",path:["images + token IDs","ViT → projector","replace image placeholders","language decoder","loss or generated IDs"],
+        annotations:[
+          {start:21,end:35,title:"Assemble the VLM",summary:"Constructs the three model components: a ViT vision encoder, the language decoder, and the modality projector. The two backbones can either load pretrained weights or initialize from the local configuration.",flow:["ViT","modality projector","language decoder"],detail:"The tokenizer supplies the special image-token ID used later to choose exactly which embedding rows the vision features replace."},
+          {start:36,end:49,title:"Splice image embeddings",summary:"Clones the text embedding sequence, finds every image-placeholder token, flattens all projected image tokens, and assigns them into those selected rows.",intuition:"The decoder receives one continuous row sequence. Image placeholders reserve seats in that sequence; this assignment swaps their ordinary token vectors for visual vectors of the same width.",shapes:[["input_ids","[B, T]"],["token_embd","[B, T, Dlm]"],["mask","[B, T]"],["image rows","[Nimage_tokens, Dlm]"]],flow:["find image-token IDs","flatten image embeddings","replace masked rows"],note:"The boolean assignment requires the number of flattened image vectors to equal the number of true mask positions. This function relies on upstream batching/tokenization to maintain that correspondence."},
+          {start:51,end:60,title:"Normalize image batches",summary:"Accepts either an image tensor or lists of image tensors. A nested list is flattened one level; nonempty lists are concatenated on batch axis and moved to the token IDs' device.",flow:["tensor → unchanged","flat list → cat","nested list → flatten → cat","empty list → None"],detail:"Returning <code>None</code> lets the same forward method handle text-only samples without invoking the vision encoder."},
+          {start:62,end:80,title:"Multimodal forward and loss",summary:"Embeds token IDs, encodes and projects images when present, replaces image placeholders, and passes the resulting embedding sequence through the decoder. With targets, it applies the LM head and computes cross-entropy while ignoring label -100.",intuition:"After the splice, the language model does not need a separate image pathway: visual and text rows travel through the same residual stream, while the target mask decides which output rows teach the model.",shapes:[["token embeddings","[B, T, Dlm]"],["projected images","[Nimg, Timg, Dlm]"],["decoder features","[B, T, Dlm]"],["logits","[B, T, V]"]],flow:["embed text","ViT(images)","project","splice","decoder","optional head + CE"],note:"The method does not shift labels or create the answer mask. It consumes the supplied target tensor as aligned, with ignored positions already set to <code>-100</code>."},
+          {start:82,end:114,title:"Multimodal prefill",summary:"Builds the complete prompt embedding sequence, including projected image rows, then runs that sequence through the decoder once to populate every layer's KV cache. The final prompt position supplies logits for the first generated token.",intuition:"Prefill is the one full reading pass: the model reads image and text together and leaves per-layer K/V notes behind. Generation then extends those notes one token at a time.",shapes:[["prompt embeddings","[B, Tprompt, Dlm]"],["prefill features","[B, Tprompt, Dlm]"],["current logits","[B, V]"]],flow:["embed + splice prompt","full decoder prefill","last position","LM head"],detail:"The conditional head application reflects the decoder's dual mode: multimodal use keeps it in embedding mode, whereas token mode can return logits directly."},
+          {start:115,end:156,title:"Sample and decode with cache",summary:"Chooses each token greedily or with top-k/top-p filtering and temperature, embeds that one token, extends the padding mask, then decodes only the new row using the accumulated KV cache.",shapes:[["current logits","[B, V]"],["next token ID","[B, 1]"],["next embedding","[B, 1, Dlm]"],["generated IDs","[B, Tnew]"]],flow:["filter logits","sample / argmax","embed token","extend mask","cached decode"],note:"KV reuse removes repeated projection of the prefix, but each new query still attends over the cached prefix. The decode attention therefore still grows with context length."},
+          {start:158,end:183,title:"Normalize tokens after EOS",summary:"Finds the first EOS position independently for each batch row and replaces every later generated position with EOS. Rows without EOS remain unchanged.",shapes:[["generated IDs","[B, Tnew]"],["EOS mask","[B, Tnew]"],["first EOS index","[B]"]],flow:["compare with EOS","find minimum index","build after-EOS mask","fill with EOS"],detail:"Generation itself does not stop individual rows early; this is post-processing after all requested decode steps have run."},
+          {start:185,end:233,title:"Load a saved VLM",summary:"Resolves config and safetensor weights from a local directory or the Hugging Face Hub, rebuilds the architecture without reloading its component backbones, and restores the complete VLM state.",flow:["resolve files","parse VLMConfig","construct without backbone download","load safetensors"],detail:"Using <code>load_backbone=False</code> avoids downloading separate ViT and LM checkpoints when a complete VLM checkpoint is already available."},
+          {start:235,end:280,title:"Save and publish",summary:"Serializes the dataclass configuration to JSON and the model state to safetensors. Publishing stages those files plus a generated model card in a temporary directory before uploading the folder.",flow:["config.json","model.safetensors","README model card","Hub upload"]}
+        ]
+      },
+      "modality_projector.py":{
+        role:"vision-language bridge",path:["ViT patch tokens","2D neighborhood packing","wider/fewer tokens","linear map to Dlm"],
+        annotations:[
+          {start:4,end:14,title:"Bridge dimensions",summary:"Configures one bias-free linear map. Before that map, a spatial packing step will multiply each token's feature width by the square of the configured scale factor.",shapes:[["ViT width","Dvit"],["packed width","Dvit · s²"],["projected width","Dlm"]],flow:["packed vision feature","linear projection","LM feature"]},
+          {start:23,end:38,title:"Pack spatial neighborhoods",summary:"Interprets the token sequence as a square patch grid, groups each s × s neighborhood, and moves those neighborhood features into the channel dimension. Token count falls by s² while feature width grows by s².",intuition:"It packs several nearby patch cards into one thicker card. Spatial resolution decreases, but no neighborhood feature is averaged away by this rearrangement.",shapes:[["input","[B, H·W, Dvit]"],["grid","[B, H, W, Dvit]"],["output","[B, H·W/s², Dvit·s²]"]],flow:["recover square grid","group s × s","permute neighborhoods","flatten into channels"],note:"Despite the helper name, this direction is a space-to-depth rearrangement. Both assertions are required: the token count must form a square and its side must be divisible by the scale factor."},
+          {start:40,end:44,title:"Project into language space",summary:"Runs spatial packing first, then maps each wider visual token into the language model's hidden width. The result can replace image-placeholder rows in the decoder input sequence.",intuition:"The linear layer acts as a learned adapter plug: it changes the visual feature vocabulary into vectors with exactly the width expected by the language model.",shapes:[["packed tokens","[B, Timg/s², Dvit·s²]"],["projected tokens","[B, Timg/s², Dlm]"]],flow:["pixel_shuffle","bias-free linear map","LM-width image tokens"]}
+        ]
+      },
+      "vision_transformer.py":{
+        role:"image encoder",path:["RGB image","patch convolution + position","bidirectional ViT blocks","final LayerNorm","patch features"],
+        annotations:[
+          {start:7,end:43,title:"Images become patch tokens",summary:"A convolution whose kernel and stride both equal patch size extracts non-overlapping patches and projects each to the ViT width. The 2D map is flattened to a sequence, then learned absolute position vectors are added.",intuition:"Think of the image as a grid of small tiles. The convolution turns each tile into one vector; position vectors retain the tile addresses after the grid is flattened into a sequence.",shapes:[["image","[B, 3, H, W]"],["patch map","[B, Dvit, H/P, W/P]"],["tokens","[B, (H/P)², Dvit]"]],flow:["RGB image","P×P stride-P conv","flatten spatial axes","optional CLS","add positions"],detail:"The sequence length formula uses the configured square image size. A CLS row is only prepended when <code>vit_cls_flag</code> is enabled."},
+          {start:47,end:68,title:"Vision attention setup",summary:"Creates one fused projection for Q, K, and V, plus an output projection. Unlike the language decoder, the ViT uses the same number of heads for all three tensors.",shapes:[["fused projection","Dvit → 3Dvit"],["head width","Dvit / H"]],flow:["patch tokens","fused QKV projection","H heads"]},
+          {start:70,end:98,title:"Bidirectional patch attention",summary:"Splits the fused projection, reshapes into heads, and performs scaled dot-product attention without a causal mask. Every image token can therefore mix information from every other image token.",intuition:"Each patch asks every patch, including itself, for relevant context. Unlike text generation there is no future to hide, because the complete image is already present.",shapes:[["q, k, v","[B, H, Timg, d]"],["attention","[B, H, Timg, Timg]"],["output","[B, Timg, Dvit]"]],flow:["split Q/K/V","reshape heads","all-to-all attention","merge heads","output projection"],note:"The SDPA path sets <code>is_causal=False</code>; the manual fallback likewise applies no causal mask. This is appropriate because an input image is available as a whole."},
+          {start:101,end:114,title:"Vision MLP",summary:"Expands each patch token to the intermediate width, applies tanh-approximated GELU, projects back to ViT width, and applies dropout.",shapes:[["input","[B, Timg, Dvit]"],["expanded","[B, Timg, Dff]"],["output","[B, Timg, Dvit]"]],flow:["fc1","GELU(tanh approx)","fc2","dropout"]},
+          {start:117,end:128,title:"Pre-norm ViT block",summary:"Adds an attention update and then an MLP update to the patch-token residual stream. Each branch reads a LayerNorm-normalized view of the current stream.",intuition:"Attention lets tiles exchange information; the MLP refines each tile's features. Residual addition preserves the current representation while accumulating both updates.",shapes:[["input / output","[B, Timg, Dvit]"]],flow:["x","LN → attention","+ x","LN → MLP","+ x"],detail:"Attention is the token-mixing branch; the MLP transforms each token independently along its feature axis."},
+          {start:131,end:168,title:"Vision encoder forward",summary:"Runs patch embedding, dropout, every ViT block, and a final LayerNorm. With CLS enabled it returns only the normalized first token; otherwise it returns all normalized patch tokens.",shapes:[["without CLS","[B, Timg, Dvit]"],["with CLS","[B, Dvit]"]],flow:["patch embed","dropout","N ViT blocks","final LayerNorm","patches or CLS"],note:"The multimodal projector expects a token sequence forming a square grid, so the VLM path relies on the configuration that returns patch tokens rather than a single CLS vector."},
+          {start:171,end:250,title:"Load SigLIP vision weights",summary:"Copies the Hugging Face SigLIP vision configuration, constructs this local ViT, maps checkpoint tensors to local module names, and manually concatenates separate Q, K, and V parameters into the fused QKV projection.",shapes:[["HF Q, K, V","three [Dvit, Dvit] tensors"],["local QKV","[3Dvit, Dvit]"]],flow:["SigLIP config","construct local ViT","map norms / MLP / projections","concatenate QKV","load state"],detail:"The learned position table gets an extra leading batch axis when needed. Other mismatched mapped shapes are reported rather than silently reshaped."}
+        ]
+      }
+    };
+
+    var order=["vision_language_model.py","vision_transformer.py","modality_projector.py","language_model.py"];
+    var state={file:order[0],index:0,source:{},lineEls:[]};
+    var tabs=document.getElementById("file-tabs"),outline=document.getElementById("outline"),codeLines=document.getElementById("code-lines"),codeScroll=document.getElementById("code-scroll"),explanation=document.getElementById("explanation");
+
+    function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+    function inline(s){return String(s||"").replace(/<code>(.*?)<\/code>/g,function(_,v){return "<code>"+esc(v)+"</code>";});}
+    function highlight(line){
+      var out="",last=0,re=/("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|#.*$|\b(?:class|def|return|if|else|elif|for|in|while|import|from|as|with|None|True|False|and|or|not|is|raise|assert|lambda|super)\b|\b\d+(?:\.\d+)?\b)/g,m;
+      while((m=re.exec(line))){out+=esc(line.slice(last,m.index));var v=m[0],cl=v[0]==="#"?"tok-comment":(v[0]==="\""||v[0]==="'")?"tok-string":/^\d/.test(v)?"tok-num":"tok-key";out+='<span class="'+cl+'">'+esc(v)+'</span>';last=m.index+v.length;if(cl==="tok-comment")break;}
+      return out+esc(line.slice(last));
+    }
+    function annotationForLine(n){var a=files[state.file].annotations;for(var i=0;i<a.length;i++)if(n>=a[i].start&&n<=a[i].end)return i;return -1;}
+    function renderTabs(){tabs.innerHTML="";order.forEach(function(name,fileIndex){var f=files[name],b=document.createElement("button");b.type="button";b.className="tab"+(name===state.file?" on":"");b.setAttribute("role","tab");b.setAttribute("aria-selected",name===state.file?"true":"false");b.tabIndex=name===state.file?0:-1;b.innerHTML='<span class="tab-name">'+esc(name)+'</span><span class="tab-role">'+esc(f.role)+'</span>';b.addEventListener("click",function(){openFile(name,0,true);});b.addEventListener("keydown",function(e){if(e.key!=="ArrowLeft"&&e.key!=="ArrowRight")return;e.preventDefault();var next=(fileIndex+(e.key==="ArrowRight"?1:-1)+order.length)%order.length;openFile(order[next],0,true);setTimeout(function(){tabs.children[next].focus();},0);});tabs.appendChild(b);});}
+    function renderPath(){var el=document.getElementById("data-path");el.innerHTML="";files[state.file].path.forEach(function(label,i){var s=document.createElement("span");s.className="path-step"+(i===0?" on":"");s.textContent=label;el.appendChild(s);});}
+    function renderOutline(){outline.innerHTML="";var list=files[state.file].annotations;document.getElementById("annotation-count").textContent=list.length+" ranges";list.forEach(function(a,i){var b=document.createElement("button");b.type="button";b.className="outline-btn"+(i===state.index?" on":"");b.innerHTML='<span class="outline-title">'+esc(a.title)+'</span><span class="outline-lines">L'+a.start+'–'+a.end+'</span>';b.addEventListener("click",function(){selectAnnotation(i,true,true);});outline.appendChild(b);});}
+    function renderCode(source){
+      var lines=source.replace(/\r\n/g,"\n").split("\n");if(lines[lines.length-1]==="")lines.pop();codeLines.innerHTML="";state.lineEls=[];
+      var frag=document.createDocumentFragment();lines.forEach(function(line,i){var n=i+1,ann=annotationForLine(n),b=document.createElement("button");b.type="button";b.className="code-line"+(ann>=0?" annotated":"");b.dataset.line=n;b.tabIndex=ann>=0?0:-1;b.setAttribute("aria-label","Line "+n+(ann>=0?", "+files[state.file].annotations[ann].title:""));b.innerHTML='<span class="ln" aria-hidden="true">'+n+'</span><span class="src">'+(line?highlight(line):" ")+'</span>';if(ann>=0)b.addEventListener("click",function(){selectAnnotation(ann,false,true);});b.addEventListener("keydown",lineKeydown);frag.appendChild(b);state.lineEls.push(b);});codeLines.appendChild(frag);document.getElementById("filename").textContent="models/"+state.file;document.getElementById("open-source").href=BASE+state.file;
+    }
+    function lineKeydown(e){if(e.key!=="ArrowDown"&&e.key!=="ArrowUp")return;e.preventDefault();var next=Number(this.dataset.line)+(e.key==="ArrowDown"?1:-1);next=Math.max(1,Math.min(state.lineEls.length,next));var el=state.lineEls[next-1];el.tabIndex=0;el.focus();var ann=annotationForLine(next);if(ann>=0)selectAnnotation(ann,false,false);}
+    function renderExplanation(){
+      var list=files[state.file].annotations,a=list[state.index];document.getElementById("selection-position").textContent=(state.index+1)+" / "+list.length;
+      var html='<div class="range">models/'+esc(state.file)+' · L'+a.start+'–L'+a.end+'</div><h2>'+esc(a.title)+'</h2><p class="summary">'+esc(a.summary)+'</p>';
+      if(a.intuition)html+='<div class="intuition"><b>Intuition · mental model</b>'+esc(a.intuition)+'</div>';
+      if(a.shapes&&a.shapes.length){html+='<div class="section-label">Shape trace</div><div class="shape-list">';a.shapes.forEach(function(row){html+='<div class="shape-row"><span>'+esc(row[0])+'</span><span class="arrow">→</span><b>'+esc(row[1])+'</b></div>';});html+='</div>';}
+      if(a.flow&&a.flow.length){html+='<div class="section-label">Control flow</div><div class="flow">';a.flow.forEach(function(v,i){if(i)html+='<i aria-hidden="true">→</i>';html+='<span>'+esc(v)+'</span>';});html+='</div>';}
+      if(a.detail)html+='<div class="section-label">Read it closely</div><p class="detail">'+inline(a.detail)+'</p>';
+      if(a.note)html+='<div class="section-label">Important boundary</div><div class="note"><b>Notice:</b> '+inline(a.note)+'</div>';
+      html+='<div class="pager"><button type="button" id="prev-ann"'+(state.index===0?' disabled':'')+'>← Previous</button><button type="button" id="next-ann"'+(state.index===list.length-1?' disabled':'')+'>Next →</button></div><p class="kbd-hint"><kbd>j</kbd> / <kbd>k</kbd> move between annotations</p>';
+      explanation.innerHTML=html;var p=document.getElementById("prev-ann"),n=document.getElementById("next-ann");p.addEventListener("click",function(){selectAnnotation(state.index-1,true,true);});n.addEventListener("click",function(){selectAnnotation(state.index+1,true,true);});
+    }
+    function updatePathProgress(){var steps=document.querySelectorAll(".path-step"),ratio=state.index/Math.max(1,files[state.file].annotations.length-1),upto=Math.round(ratio*(steps.length-1));steps.forEach(function(s,i){s.classList.toggle("on",i<=upto);});}
+    function selectAnnotation(index,scroll,updateHash){
+      var list=files[state.file].annotations;state.index=Math.max(0,Math.min(index,list.length-1));var a=list[state.index];
+      state.lineEls.forEach(function(el){var n=Number(el.dataset.line);el.classList.toggle("active",n>=a.start&&n<=a.end);});
+      outline.querySelectorAll(".outline-btn").forEach(function(b,i){b.classList.toggle("on",i===state.index);if(i===state.index)b.setAttribute("aria-current","true");else b.removeAttribute("aria-current");});
+      renderExplanation();updatePathProgress();
+      if(scroll){var target=state.lineEls[a.start-1],behavior=(!updateHash||matchMedia("(prefers-reduced-motion: reduce)").matches)?"auto":"smooth";if(target)codeScroll.scrollTo({top:Math.max(0,target.offsetTop-codeScroll.clientHeight*.28),behavior:behavior});var ob=outline.children[state.index];if(ob){if(innerWidth<=1080)outline.scrollTo({left:Math.max(0,ob.offsetLeft-(outline.clientWidth-ob.offsetWidth)/2),behavior:behavior});else outline.scrollTo({top:Math.max(0,ob.offsetTop-outline.clientHeight*.4),behavior:behavior});}}
+      if(updateHash)history.replaceState(null,"","#"+encodeURIComponent(state.file)+":"+a.start);
+    }
+    function loadSource(name){if(state.source[name])return Promise.resolve(state.source[name]);return fetch("./annotated-source/"+name).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text();}).then(function(s){state.source[name]=s;return s;});}
+    function openFile(name,index,updateHash){
+      state.file=name;state.index=index||0;renderTabs();renderPath();renderOutline();codeLines.innerHTML='<div class="loading">Loading pinned source…</div>';
+      loadSource(name).then(function(s){if(state.file!==name)return;renderCode(s);selectAnnotation(state.index,true,updateHash);}).catch(function(err){codeLines.innerHTML='<div class="loading">Could not load the local source mirror: '+esc(err.message)+'. Serve this directory over HTTP to use the annotated viewer.</div>';});
+    }
+    function initialSelection(){var raw=decodeURIComponent(location.hash.slice(1)),parts=raw.split(":"),name=files[parts[0]]?parts[0]:order[0],line=Number(parts[1]),index=0;if(line){var list=files[name].annotations;for(var i=0;i<list.length;i++)if(line>=list[i].start&&line<=list[i].end){index=i;break;}}return [name,index];}
+    document.getElementById("themebtn").addEventListener("click",function(){var root=document.documentElement,cur=root.dataset.theme||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"),next=cur==="dark"?"light":"dark";root.dataset.theme=next;try{localStorage.setItem("vlm-theme",next);}catch(e){}});
+    document.getElementById("copy-link").addEventListener("click",function(){var a=files[state.file].annotations[state.index],url=location.href.split("#")[0]+"#"+encodeURIComponent(state.file)+":"+a.start,b=this;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(url).then(function(){b.textContent="✓";setTimeout(function(){b.textContent="#";},900);});else{location.hash=encodeURIComponent(state.file)+":"+a.start;}});
+    document.addEventListener("keydown",function(e){if(/input|textarea|button/i.test(e.target.tagName)||e.altKey||e.ctrlKey||e.metaKey)return;if(e.key==="j"){e.preventDefault();selectAnnotation(state.index+1,true,true);}if(e.key==="k"){e.preventDefault();selectAnnotation(state.index-1,true,true);}});
+    var first=initialSelection();openFile(first[0],first[1],false);
+  })();
+  </script>
+</body>
+</html>
