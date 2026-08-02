@@ -52,6 +52,7 @@ math[display="block"]{display:block;margin:1rem auto;text-align:center;overflow-
 .themebtn:hover{border-color:var(--accent);color:var(--ink)}
 .toplink{font-family:var(--sans);font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--line-2);white-space:nowrap}
 .toplink:hover{color:var(--accent-ink);border-bottom-color:var(--accent)}
+@media(max-width:760px){.repo-link{display:none}}
 @media(max-width:460px){.toplink{font-size:.72rem}.brand{max-width:7.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 header.hero{padding:3.4rem 0 1.4rem}
 .eyebrow{font-size:.76rem;font-weight:640;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-ink)}
@@ -297,6 +298,8 @@ footer a{color:var(--accent-ink)}
 </style></head><body><div class="topbar"><div class="wrap">
   <span class="brand">LLM <span class="dot">→</span> VLM &nbsp;workshop</span>
   <span class="spacer"></span>
+  <a class="toplink repo-link" href="https://github.com/infinitylogesh/nanoVLM" target="_blank" rel="noreferrer">nanoVLM repo</a>
+  <a class="toplink repo-link" href="https://github.com/infinitylogesh/VLM_workshop" target="_blank" rel="noreferrer">workshop repo</a>
   <a class="toplink" href="./annotated-code.html">annotated source</a>
   <button class="themebtn" id="themebtn" aria-label="Toggle color theme">◐ theme</button>
 </div><div class="tprog" id="tprog"></div></div>
@@ -315,8 +318,8 @@ footer a{color:var(--accent-ink)}
   trick all the way up — with real math, live widgets, and the actual training curves — then walks the
   four ways you post-train the result.</p>
   <div class="meta">
-    <span><b>Part I</b> · building a VLM (nanoVLM, 222M)</span>
-    <span><b>Part II</b> · training it (SFT · GRPO · distillation · self-distillation)</span>
+    <span><b>Part I</b> · <a href="https://github.com/infinitylogesh/nanoVLM" target="_blank" rel="noreferrer">building a VLM (nanoVLM, 222M)</a></span>
+    <span><b>Part II</b> · <a href="https://github.com/infinitylogesh/VLM_workshop" target="_blank" rel="noreferrer">training it (SFT · GRPO · distillation · self-distillation)</a></span>
   </div>
   <div class="readtime">≈20 min main path · every <b style="color:var(--accent-ink)">▸ Go deeper</b> block and the
   appendix are optional depth you can expand.</div>
@@ -1571,6 +1574,8 @@ Here is the correct extraction for reference:
   <p>Interactive companion to the VLM workshop. Figures reimplement the repositories' own code in vanilla
   JavaScript; the curves and eval numbers are the measured results. Press <span class="kbd">t</span> to
   toggle theme.</p>
+  <p>Source repositories: <a href="https://github.com/infinitylogesh/nanoVLM" target="_blank" rel="noreferrer">nanoVLM</a>
+  and <a href="https://github.com/infinitylogesh/VLM_workshop" target="_blank" rel="noreferrer">VLM workshop</a>.</p>
 </footer>
 
 </div></main>
