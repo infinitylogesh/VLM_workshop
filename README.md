@@ -18,7 +18,7 @@ uv sync && source .venv/bin/activate && export PYTHONPATH=src
 jupyter lab workshop_walkthrough.ipynb
 ```
 
-📖 Or just read it: **[`docs/index.html`](docs/index.html)** is a self-contained, distill.pub-style
+📖 Or just read it: **[`Workshop Companion page`](https://logeshumapathi.com/VLM_workshop/)** is a self-contained, distill.pub-style
 **interactive post** spanning both workshop repos (Part I — how a VLM is built; Part II — how it's
 trained), with live figures including a working **reward calculator**, the SFT loss-mask highlighter, the
 teacher-vs-student prompt diff, and the results chart. Open it in any browser — no build step.
@@ -35,6 +35,9 @@ Pinned to the stack verified on this box (RTX PRO 6000 Blackwell, CUDA 12.8 driv
 recompiles it.
 
 ```bash
+git clone https://github.com/infinitylogesh/VLM_workshop.git
+mkdir wheels/ && wget -P wheels/ https://github.com/infinitylogesh/VLM_workshop/releases/download/deps-v1/flash_attn-2.8.3.post1-cp312-cp312-linux_x86_64.whl
+
 cd /workspace/vlm_workshop
 uv sync                       # builds .venv from pyproject.toml + uv.lock
 source .venv/bin/activate
