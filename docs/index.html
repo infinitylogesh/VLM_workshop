@@ -1037,7 +1037,80 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
   sum is the <strong>return</strong>, and a value function estimates the return expected from a state:</p>
   <math display="block"><mrow><msub><mi>G</mi><mi>t</mi></msub><mo>=</mo><munderover><mo>∑</mo><mrow><mi>k</mi><mo>=</mo><mn>0</mn></mrow><mi>T</mi></munderover><msup><mi>γ</mi><mi>k</mi></msup><msub><mi>r</mi><mrow><mi>t</mi><mo>+</mo><mi>k</mi></mrow></msub><mo>,</mo><mspace width=".7em"/><msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub><mo>=</mo><msub><mi>G</mi><mi>t</mi></msub><mo>−</mo><mi>V</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo></mrow></math>
   <p>The estimated <strong>advantage</strong> asks a relative question: did this sampled outcome beat the
-  baseline for that state? Try the complete loop below. Drive manually, sample the policy, inspect any step,
+  baseline for that state? Read the pair of formulas as one sentence: <em>starting from time
+  <math><mi>t</mi></math>, how much reward did I eventually collect, and was that better or worse than I
+  expected?</em></p>
+
+  <h3>Worked example: the arithmetic behind <math><msub><mi>G</mi><mi>t</mi></msub></math> and <math><msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub></math></h3>
+  <p>Take one action at <math><msub><mi>s</mi><mi>t</mi></msub></math> and suppose the rest of the episode
+  hands out three rewards:</p>
+  <div class="tbl"><table>
+    <thead><tr><th>time</th><th>reward <math><msub><mi>r</mi><mi>t</mi></msub></math></th><th>discount <math><msup><mi>γ</mi><mi>k</mi></msup></math> at <math><mrow><mi>γ</mi><mo>=</mo><mn>0.9</mn></mrow></math></th><th>contribution</th></tr></thead>
+    <tbody>
+      <tr><td><math><mi>t</mi></math></td><td>2</td><td>1.00</td><td>2.00</td></tr>
+      <tr><td><math><mrow><mi>t</mi><mo>+</mo><mn>1</mn></mrow></math></td><td>3</td><td>0.90</td><td>2.70</td></tr>
+      <tr><td><math><mrow><mi>t</mi><mo>+</mo><mn>2</mn></mrow></math></td><td>5</td><td>0.81</td><td>4.05</td></tr>
+    </tbody>
+  </table></div>
+  <div class="eq"><math><msub><mi>G</mi><mi>t</mi></msub></math> = 2 + 0.9(3) + 0.9<sup>2</sup>(5) = 2 + 2.7 + 4.05 = <span class="frac">8.75</span></div>
+  <p>The discount <math><mi>γ</mi></math> is the only knob in that sum. At
+  <math><mrow><mi>γ</mi><mo>=</mo><mn>1</mn></mrow></math> nothing decays and the return is just
+  <math><mrow><mn>2</mn><mo>+</mo><mn>3</mn><mo>+</mo><mn>5</mn><mo>=</mo><mn>10</mn></mrow></math>; the
+  smaller <math><mi>γ</mi></math> gets, the more the immediate reward dominates and the less a distant
+  payoff can justify the action taken now.</p>
+  <p>Now bring in the baseline. Suppose the value network had predicted
+  <math><mrow><mi>V</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo><mo>=</mo><mn>6</mn></mrow></math>
+  — “before seeing what happens, I expect about 6 units of future reward from this state.” Reality delivered
+  8.75, so</p>
+  <div class="eq"><math><msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub></math> = 8.75 − 6 = <span class="frac">+2.75</span> &nbsp;→&nbsp; better than expected, make that action <b>more</b> likely</div>
+  <p>Had the critic been optimistic instead, at
+  <math><mrow><mi>V</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo><mo>=</mo><mn>10</mn></mrow></math>,
+  the very same rollout gives
+  <math><mrow><mn>8.75</mn><mo>−</mo><mn>10</mn><mo>=</mo><mo>−</mo><mn>1.25</mn></mrow></math>: the
+  trajectory after this action was <em>worse</em> than the state's reputation, so the policy pushes its
+  probability down. The reward sequence never changed — only the expectation it was measured against.</p>
+  <figure class="fig reveal" id="fig-advcalc">
+    <div class="fig-title">advantage calculator · rewards 2, 3, 5 after <math><msub><mi>s</mi><mi>t</mi></msub></math></div>
+    <div class="sliderrow">discount γ <input type="range" id="adv-gamma" min="0" max="100" value="90"><span class="val" id="adv-gamma-val">0.90</span></div>
+    <div class="sliderrow">baseline V(sₜ) <input type="range" id="adv-v" min="0" max="120" value="60"><span class="val" id="adv-v-val">6.0</span></div>
+    <div class="hint" id="adv-terms" style="font-family:var(--mono);margin-top:.6rem"></div>
+    <div class="stats" style="margin-top:.7rem">
+      <div class="stat"><div class="k">return Gₜ</div><div class="v" id="adv-g">—</div></div>
+      <div class="stat"><div class="k">baseline V(sₜ)</div><div class="v" id="adv-vv">—</div></div>
+      <div class="stat accent"><div class="k">advantage Âₜ</div><div class="v" id="adv-a">—</div></div>
+    </div>
+    <figcaption id="adv-cap"></figcaption>
+  </figure>
+  <div class="take"><div class="ct">the one line to remember</div>advantage = <b>actual outcome − expected
+  outcome</b>. <math><mrow><mi>V</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo></mrow></math> is
+  an expectation formed <em>before</em> seeing the future;
+  <math><msub><mi>G</mi><mi>t</mi></msub></math> is what actually happened in this one sampled rollout. The
+  sign of the difference decides whether the action is reinforced or suppressed; its magnitude decides how
+  hard.</div>
+  <h3>The same arithmetic on tokens</h3>
+  <p>Nothing changes when the state is a prompt plus the tokens generated so far and the action is the next
+  chunk of text:</p>
+  <pre>state sₜ   prompt "What is 17 × 8?"  +  tokens so far "17 × 8 ="
+critic     V(sₜ) = 0.65        <span class="c"># what the model expected from here</span>
+
+action     "136"   → r = 1     <span class="c"># correct</span>
+           Gₜ = 1    Âₜ = 1 − 0.65 = +0.35   → raise p(this continuation)
+
+action     "146"   → r = 0     <span class="c"># wrong</span>
+           Gₜ = 0    Âₜ = 0 − 0.65 = −0.65   → lower p(this continuation)</pre>
+  <p>The reward is scored once at the end of the completion, the critic's estimate is what the model expected
+  from that partial state, and the difference is what the policy gradient actually consumes.</p>
+  <details class="intuition"><summary>Intuition: this is the Monte Carlo estimate — GAE is the variance-reduced cousin</summary><div class="ibody">
+    <p><math><mrow><msub><mover><mi>A</mi><mo>^</mo></mover><mi>t</mi></msub><mo>=</mo><msub><mi>G</mi><mi>t</mi></msub><mo>−</mo><mi>V</mi><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo></mrow></math>
+    is a <b>Monte Carlo</b> advantage: it uses the <em>entire</em> observed future return, so it is unbiased
+    but noisy — one unlucky rollout can swamp the estimate. PPO implementations usually swap in <b>GAE</b>,
+    which blends the observed rewards with the critic's own predictions over a short horizon to trade a
+    little bias for much less variance. Conceptually it answers the identical question: <em>was this action
+    better or worse than expected?</em> GRPO, in §8, answers it a third way — no critic at all, with other
+    completions of the same prompt supplying the baseline.</p>
+  </div></details>
+
+  <p>Try the complete loop below. Drive manually, sample the policy, inspect any step,
   then apply an update and watch its action probabilities change.</p>
   <figure class="fig reveal" id="fig-rlgame">
     <div class="fig-title">policy playground · reward → return → advantage → update</div>
@@ -1208,6 +1281,96 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
     <canvas id="clip-canvas" width="1040" height="360" style="margin-top:.6rem;width:100%;border-radius:8px"></canvas>
     <figcaption id="clip-cap"></figcaption>
   </figure>
+  <details class="deep"><summary>Go deeper: from PPO to GRPO — what the group replaces</summary><div class="dbody">
+    <p>Both algorithms answer the same question: <em>we generated responses, received rewards, and now want
+    good responses to become more likely and bad ones less likely — without moving the model too far in one
+    update.</em> GRPO is best understood as PPO with one component deleted.</p>
+
+    <p><b>1 · The probability ratio.</b> Generation is a sequence of RL actions:
+    <math><mrow><msub><mi>s</mi><mi>t</mi></msub><mo>=</mo><mo>(</mo><mi>x</mi><mo>,</mo><msub><mi>y</mi><mrow><mo>&lt;</mo><mi>t</mi></mrow></msub><mo>)</mo></mrow></math>,
+    <math><mrow><msub><mi>a</mi><mi>t</mi></msub><mo>=</mo><msub><mi>y</mi><mi>t</mi></msub></mrow></math>,
+    and the policy <em>is</em> the language model. Plain policy gradient would just push
+    <math><mrow><mi>log</mi><mspace width=".1em"/><msub><mi>π</mi><mi>θ</mi></msub><mo>(</mo><msub><mi>a</mi><mi>t</mi></msub><mo>|</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo><msub><mi>A</mi><mi>t</mi></msub></mrow></math>
+    uphill — but a single rollout can then move a probability enormously, and in a neural network that
+    collaterally changes thousands of other behaviors. PPO measures the movement explicitly:</p>
+    <pre>prompt "What is 17 × 8?"   → completion "17 × 8 = 136",  A = +0.5
+
+π_old("136") = 0.20
+π_θ  ("136") = 0.22   ρ = 0.22/0.20 = 1.10   <span class="c"># 10% more likely — fine</span>
+π_θ  ("136") = 0.60   ρ = 0.60/0.20 = 3.00   <span class="c"># 3× in one update — too far</span></pre>
+    <p>Note <math><mi>ρ</mi></math> is a <em>probability ratio</em>, not a reward (PPO papers confusingly
+    call it <math><msub><mi>r</mi><mi>t</mi></msub></math>). With <math><mrow><mi>ε</mi><mo>=</mo><mn>0.2</mn></mrow></math>
+    the clip caps the useful range at <math><mrow><mo>[</mo><mn>0.8</mn><mo>,</mo><mn>1.2</mn><mo>]</mo></mrow></math>:
+    once <math><mi>ρ</mi></math> passes 1.2 with a positive advantage, the <math><mi>min</mi></math> takes the
+    flat branch and there is no more gradient reward for pushing further. Negative advantage runs the same
+    logic in reverse — a wrong answer whose probability drops 0.20 → 0.02 gives
+    <math><mrow><mi>ρ</mi><mo>=</mo><mn>0.1</mn></mrow></math>, far below <math><mn>0.8</mn></math>, and the
+    clip removes the incentive to annihilate it in one step. That is exactly the flat shelf in the figure
+    above, and GRPO inherits this piece unchanged.</p>
+
+    <p><b>2 · Where PPO's advantage comes from.</b> PPO trains a <b>critic</b>
+    <math><mrow><msub><mi>V</mi><mi>ϕ</mi></msub><mo>(</mo><msub><mi>s</mi><mi>t</mi></msub><mo>)</mo></mrow></math>
+    that predicts the reward expected from a state, and sets
+    <math><mrow><mi>A</mi><mo>=</mo><mi>G</mi><mo>−</mo><mi>V</mi></mrow></math> (in practice GAE, §7.5).
+    So a rollout scoring <math><mrow><mi>G</mi><mo>=</mo><mn>1</mn></mrow></math> against
+    <math><mrow><mi>V</mi><mo>=</mo><mn>0.6</mn></mrow></math> yields
+    <math><mrow><mi>A</mi><mo>=</mo><mo>+</mo><mn>0.4</mn></mrow></math>. That critic is a second large
+    network to train and hold in memory, and RLHF adds more: the <b>old policy</b> snapshot that generated the
+    rollouts, a frozen <b>reference model</b>, and often a learned <b>reward model</b>.</p>
+    <p>The two frozen-ish policies do different jobs and are easy to conflate:</p>
+    <pre>π_old  → the snapshot that produced this batch; denominator of ρ.
+         "don't change too much <b>within</b> this update"
+π_ref  → the original SFT model; target of a β·KL(π_θ ‖ π_ref) penalty.
+         "don't drift too far from sane language behavior <b>overall</b>"</pre>
+    <p>The workshop run sets <math><mrow><mi>β</mi><mo>=</mo><mn>0</mn></mrow></math>, so
+    <math><msub><mi>π</mi><mi>ref</mi></msub></math> drops out entirely and only the clip constrains the
+    update.</p>
+
+    <p><b>3 · GRPO's one idea: delete the critic.</b> Instead of asking a value network “how good <em>should</em>
+    this be?”, sample several completions for the <em>same</em> prompt and let them judge each other:</p>
+    <pre>prompt "What is 17 × 8?"  ·  G = 4 samples
+
+A: 136   r = 1.0      mean μ = 0.5      A_A = (1.0 − 0.5)/0.5 = +1
+B: 146   r = 0.0      std  σ ≈ 0.5      A_B = (0.0 − 0.5)/0.5 = −1
+C: 136   r = 1.0                        A_C = +1
+D: 126   r = 0.0                        A_D = −1</pre>
+    <p>With a wider spread the ordering does the work — sample 8 completions scoring
+    <code>0.1, 0.2, 0.2, 0.4, 0.7, 0.8, 0.9, 0.9</code> and the group's own mean (0.525) splits them: the
+    first four get negative advantages, the last four positive. The optimizer's instruction is
+    “<em>among the ways you yourself tried this prompt, make the better ones more likely</em>.” That is the
+    whole substitution:</p>
+    <div class="eq">PPO: <math><mrow><mi>A</mi><mo>=</mo><mi>R</mi><mo>−</mo><mi>V</mi><mo>(</mo><mi>s</mi><mo>)</mo></mrow></math> &nbsp;→&nbsp; GRPO: <math><mrow><msub><mi>A</mi><mi>i</mi></msub><mo>=</mo><mo>(</mo><msub><mi>R</mi><mi>i</mi></msub><mo>−</mo><mi>mean</mi><mo>)</mo><mo>/</mo><mi>std</mi></mrow></math><br><span class="frac">critic's expectation → peer responses' average</span></div>
+
+    <p><b>4 · Why this suits LLMs.</b> A per-token critic has an awkward job. Asked to score the prefixes
+    <code>"Assume"</code>, <code>"Assume √"</code>, <code>"Assume √2"</code> of a proof, it must predict how
+    the <em>eventual</em> proof will be judged — a hard regression problem, requiring another network trained
+    alongside. Where final outputs can be scored reliably (a verifiable answer, a parseable JSON, a match
+    against gold fields), “generate 8, score 8, compare” is a far more natural baseline and strictly cheaper.</p>
+
+    <p><b>5 · The costs of going relative.</b> Group-relative advantage is <em>only</em> relative. If every
+    completion is terrible — rewards <code>0.01, 0.02, 0.03, 0.04</code> — GRPO still reinforces the 0.04 as
+    if it were good. And if every completion is equally good, every numerator is zero and the group teaches
+    nothing; that is precisely the saturation this run hit (next figure). Reward design, group size, and
+    sampling diversity are therefore not tuning details but the mechanism itself. A second limitation is
+    <b>credit assignment</b>: outcome-based GRPO attaches the same completion-level
+    <math><msub><mi>A</mi><mi>i</mi></msub></math> to every token, so in
+    <code>"= 17 × (4 × 2) = 68 × 2 = 136"</code> the pivotal step and the filler words receive identical
+    signal. Process reward models exist to sharpen this.</p>
+
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>PPO</th><th>GRPO</th></tr></thead>
+      <tbody>
+        <tr><td>policy + old policy</td><td>yes</td><td>yes</td></tr>
+        <tr><td>clipped ratio objective</td><td>yes</td><td>yes (unchanged)</td></tr>
+        <tr><td>value / critic network</td><td><b>required</b></td><td><b>none</b></td></tr>
+        <tr><td>advantage baseline</td><td><math><mrow><mi>V</mi><mo>(</mo><mi>s</mi><mo>)</mo></mrow></math>, a learned prediction</td><td>mean reward of the group</td></tr>
+        <tr><td>samples per prompt</td><td>optional</td><td>fundamental (G = 8 here)</td></tr>
+        <tr><td>reference model / KL</td><td>usual</td><td>optional (β = 0 here)</td></tr>
+        <tr><td>memory &amp; compute</td><td>higher</td><td>lower — one fewer large model</td></tr>
+        <tr><td>failure mode</td><td>a miscalibrated critic</td><td>a group whose rewards tie</td></tr>
+      </tbody>
+    </table></div>
+  </div></details>
   <p>No gold tokens are involved — only the policy re-weighting its own samples. That design has a sharp failure
   mode; here it is, live:</p>
   <figure class="fig reveal" id="fig-rollout">
@@ -1322,7 +1485,32 @@ python train/sft.py --datasets sroie,cord --report-to none</pre>
     teacher mode — safe, but it can smear probability onto unlikely tokens. <b>Reverse KL</b>
     <math><mrow><mi>KL</mi><mo>(</mo><mi>s</mi><mo>∥</mo><mi>t</mi><mo>)</mo></mrow></math> (β→1 in TRL) is
     <em>mode-seeking</em>: the student may drop teacher modes as long as its own mass sits under the teacher —
-    sharper, but it can collapse. The generalized JSD at β=0.5 interpolates. <b>On-policy</b> means the
+    sharper, but it can collapse. The generalized JSD at β=0.5 interpolates.</p>
+    <p>The shortest intuition:</p>
+    <div class="intuition-points">
+      <div class="intuition-point"><b>mode-covering</b><p>“Learn all the reasonable things the teacher might do.”</p></div>
+      <div class="intuition-point"><b>mode-seeking</b><p>“Learn to do one of the teacher's best things really well.”</p></div>
+    </div>
+    <p>Concretely, take the prompt <em>“Write a polite acknowledgement.”</em> The teacher spreads its mass
+    over several perfectly valid continuations — there is no single gold answer here:</p>
+    <div class="tbl"><table>
+      <thead><tr><th>continuation</th><th>teacher <math><mi>t</mi></math></th><th>mode-covering student</th><th>mode-seeking student</th></tr></thead>
+      <tbody>
+        <tr><td><code>"Sure, happy to help."</code></td><td>0.35</td><td>0.32</td><td><b>0.75</b></td></tr>
+        <tr><td><code>"Absolutely!"</code></td><td>0.25</td><td>0.26</td><td>0.15</td></tr>
+        <tr><td><code>"Of course."</code></td><td>0.20</td><td>0.21</td><td>0.06</td></tr>
+        <tr><td><code>"Certainly."</code></td><td>0.15</td><td>0.14</td><td>0.02</td></tr>
+        <tr><td class="hint"><code>"Nonsense…"</code></td><td class="hint">0.01</td><td class="hint">0.01</td><td class="hint">≈0</td></tr>
+      </tbody>
+    </table></div>
+    <p>The mode-covering student reproduces the <em>shape</em> of the teacher's distribution: every acceptable
+    phrasing keeps roughly its original share. The mode-seeking student has instead said “these are all good,
+    but I don't need to represent them equally well — I'll concentrate my capacity on the strongest region,”
+    and collapsed onto one. Both are faithful in their own sense; they differ in what a small student spends
+    its limited capacity on. That is also why the choice is task-dependent: for open-ended phrasing, covering
+    preserves diversity, while for a task with one correct output — a receipt's JSON — seeking is closer to
+    what you actually want.</p>
+    <p><b>On-policy</b> means the
     divergence is measured on tokens the <em>student itself</em> sampled, so training fixes the student's own
     mistakes rather than teacher text it would never produce — the reason on-policy GKD beats plain
     sequence-level distillation on a fixed teacher corpus.</p>
@@ -2767,6 +2955,30 @@ W(function(){
     cap.innerHTML=p>0.8?"Confident and correct — the penalty is nearly <b>0</b> and the gradient fades.":p<0.15?"The model barely believes the gold token — a <b>large</b> penalty and a strong corrective gradient.":"Middling confidence — the loss is just the height of the green dot on the −log curve.";
   }
   r.addEventListener("input",draw);onView(cv,draw);draw();new MutationObserver(draw).observe(root,{attributes:true,attributeFilter:["data-theme"]});
+});
+
+/* RL primer · return + advantage calculator */
+W(function(){
+  var g=document.getElementById("adv-gamma"),gv=document.getElementById("adv-gamma-val"),
+      v=document.getElementById("adv-v"),vv=document.getElementById("adv-v-val"),
+      terms=document.getElementById("adv-terms"),outG=document.getElementById("adv-g"),
+      outV=document.getElementById("adv-vv"),outA=document.getElementById("adv-a"),
+      cap=document.getElementById("adv-cap");
+  if(!g)return;
+  var R=[2,3,5];
+  function draw(){
+    var gam=+g.value/100,base=+v.value/10,G=0,parts=[];
+    R.forEach(function(r,k){var d=Math.pow(gam,k);G+=d*r;parts.push(k===0?String(r):d.toFixed(2)+"("+r+")");});
+    var A=G-base;
+    gv.textContent=gam.toFixed(2);vv.textContent=base.toFixed(1);
+    terms.textContent="Gₜ = "+parts.join(" + ")+" = "+G.toFixed(2);
+    outG.textContent=G.toFixed(2);outV.textContent=base.toFixed(2);
+    outA.textContent=(A>=0?"+":"")+A.toFixed(2);
+    cap.innerHTML=A>0.05?"Better than the baseline expected — the policy gradient <b>raises</b> the probability of the action taken at sₜ."
+      :A<-0.05?"Worse than the baseline expected — the gradient <b>lowers</b> the probability of that action."
+      :"The rollout matched the critic almost exactly, so the advantage is ≈0 and this step barely moves the policy.";
+  }
+  g.addEventListener("input",draw);v.addEventListener("input",draw);draw();
 });
 
 /* GRPO · clipped surrogate diagram */
