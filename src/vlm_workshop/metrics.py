@@ -71,7 +71,33 @@ def norm_value(v) -> str:
 
 def flatten_leaves(obj, prefix: str = ""):
     """Yield (leaf_key, normalized_value) pairs. List indices are dropped from
-    the key so repeated items share a key; empty/None values are skipped."""
+    the key so repeated items share a key; empty/None values are skipped.
+    
+    obj = {
+    "user": {
+        "name": "Alice",
+        "age": 30,
+        "emails": [
+            {"type": "work", "address": "alice@company.com"},
+            {"type": "personal", "address": "alice@gmail.com"}
+        ]
+        }
+    }
+
+    to:
+
+    [
+    ("user.name", "Alice"),
+    ("user.age", "30"),
+
+    ("user.emails.type", "work"),
+    ("user.emails.address", "alice@company.com"),
+
+    ("user.emails.type", "personal"),
+    ("user.emails.address", "alice@gmail.com")
+    ]
+    
+    """
     if isinstance(obj, dict):
         for k, v in obj.items():
             key = f"{prefix}.{k}" if prefix else str(k)
